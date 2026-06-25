@@ -3,6 +3,8 @@
 # accediendo a los discos montados en los directorios /trazas1, /trazas2 y /trazas3.
 # Los resultados irán al disco limpio en /opt2.
 
+__version__ = "1.0.0"
+
 import subprocess
 import sys
 import time
@@ -41,6 +43,11 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
+    )
+
+
+    parser.add_argument(
         "--rutaOrigen",
         required=True,
         help="Directorio de montaje del direcorio a procesar (ej: /trazas1)"
@@ -57,9 +64,9 @@ def parse_args():
     )
 
     parser.add_argument(
-    "--zip",
-    action="store_true",
-    help="Si se indica, comprime el directorio de resultados en un zip al finalizar"
+        "--zip",
+        action="store_true",
+        help="Si se indica, comprime el directorio de resultados en un zip al finalizar"
     )
 
     return parser.parse_args()
@@ -488,7 +495,7 @@ def main():
 
         obtenerValoresDelConfig(rutaConfig)
 
-        serial_trazas = "mockeo" #  obtener_serial(directorioOrigen) # "mockeo" #  
+        serial_trazas = obtener_serial(directorioOrigen) # "mockeo" #  
         primerTimestamp = obtenerTimestamp(directorioOrigen)
         nombreDirectorioSalidaPrimerNivel = f"{serial_trazas}_{primerTimestamp}"
         directorioSalidaPrimerNivel = os.path.join(directorioDestino, nombreDirectorioSalidaPrimerNivel)
