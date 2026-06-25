@@ -1,0 +1,68 @@
+--inputFile {inputDirectory}
+--dirOfFiles 
+--outputFile {outputDirectory}
+--showGlobals 
+--showProgress
+--showLogAll
+--ramLimit 15000
+--procesarICMP 
+--rttFlightPkts 1
+--rttMaxSamples 5
+--rttSamplingInterval 1
+--rttKeepFirstSamples
+--hilosProcesado 1
+--pathModules {modulesDirectory} 
+--loadModule moduleTCPfirstData.so
+--loadModule moduleUDPfirstData.so
+--loadModule moduleTCPhistFlags.so
+--loadModule moduleTLSAppLevel.so
+--loadModule moduleDNSparserAppLevel.so
+--loadModule moduloSerieTemporal.so
+--appLevelProtos tcpFirstData,tcpHistFlags,tls
+--appLevelProtosUDP udpFirstData,procesaDNS
+--appLevelOpt procesaDNS:allowPartialData
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20)
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and ip proto 1
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and ip proto 6
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and ip proto 17
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and not (ip proto 1 or ip proto 6 or ip proto 17)
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and (port 80 or port 443)
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and (port 20 or port 21)
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 22
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 23
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 445
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 3306
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 3389
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 5432
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and tcp and port 5900
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and udp and port 53
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and udp and port 69
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and udp and port 123
+--externArgs tseries:pcapFilter=(src net 130.206.158.0/23 or src net 130.206.160.0/20) and udp and (port 161 or port 162)
+--externArgs tseries:pcapFilter= src net 2001:720:1d10::/48 and ip6
+--externArgs tseries:pcapFilter= src net 2001:720:1d10::/48 and not (ip6 proto 58 or ip6 proto 6 or ip6 proto 17)
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20)
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and ip proto 1
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and ip proto 6
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and ip proto 17
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and not (ip proto 1 or ip proto 6 or ip proto 17)
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and (port 80 or port 443)
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and (port 20 or port 21)
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 22
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 23
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 445
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 3306
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 3389
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 5432
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and tcp and port 5900
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and udp and port 53
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and udp and port 69
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and udp and port 123
+--externArgs tseries:pcapFilter=(dst net 130.206.158.0/23 or dst net 130.206.160.0/20) and udp and (port 161 or port 162)
+--externArgs tseries:pcapFilter=dst net 2001:720:1d10::/48 and ip6 
+--externArgs tseries:pcapFilter=dst net 2001:720:1d10::/48 and not (ip6 proto 58 or ip6 proto 6 or ip6 proto 17)
+--externArgs tseries:output={outputFileModuloTseries}
+--externArgs tseries:intervalo=1000
+--externArgs tseries:todoEnUnFichero
+--logFile {pathLogFile} 
+
