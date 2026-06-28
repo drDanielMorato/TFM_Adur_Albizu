@@ -3,7 +3,7 @@
 # accediendo a los discos montados en los directorios /trazas1, /trazas2 y /trazas3.
 # Los resultados irán al disco limpio en /opt2.
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 import subprocess
 import sys
@@ -60,7 +60,7 @@ def parse_args():
     parser.add_argument(
         "--rutaConfig",
         required=True,
-        help="Directorio donde se almacena el archivo de configuraciones config.ini (ej: /opt3/Desktop/ScriptProcesado)"
+        help="Ruta del archivo de configuraciones config.ini (ej: /opt3/Desktop/ScriptProcesado/config.ini)"
     )
 
     parser.add_argument(
@@ -469,7 +469,7 @@ def obtenerValoresDelConfig(rutaConfig):
     global RUTA_CONFIGURACIONES_PROCESACONEXIONES, RUTA_BINARIO_PROCESACONEXIONES, RUTA_BINARIO_TSERIES, RUTA_MODULOS_PROCESACONEXIONES
 
     config = configparser.ConfigParser()
-    config.read(os.path.join(rutaConfig,'config.ini'))
+    config.read(rutaConfig)
 
     RUTA_CONFIGURACIONES_PROCESACONEXIONES = config['rutas']['rutaConfiguracionesProcesaConexiones'] 
     RUTA_BINARIO_PROCESACONEXIONES = config['rutas']['rutaBinarioProcesaConexiones']
