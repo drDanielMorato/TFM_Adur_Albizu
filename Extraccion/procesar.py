@@ -1,7 +1,7 @@
 # Este script se utilizará para generar registros de flujo mediante procesaConexiones. 
 # ProcesaConexiones se lanzará con sus opciones básicas y una serie de modulos, 
 # los cuales pueden ser configurados a través su archivo de configuraciones (p. ej.ConfiguracionesProcesaConexiones.txt)
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 import subprocess
 import sys
@@ -18,22 +18,28 @@ import stat
 from typing import List, Dict, Set, FrozenSet, Tuple
 import shlex
 
-# Nombre del archivo analizado para encontrar parejas de MACs de la UPNA para tseries
+# Nombre del archivo analizado para encontrar parejas de MACs de la UPNA para tseries:
 ARCHIVO_ANALIZADO = "salida_udp_" 
-# Nombre del archivo de salida donde se almacenan las estadísticas de procesaConexiones
+# Nombre del archivo de salida donde se almacenan las estadísticas de procesaConexiones:
 ARCHIVO_GLOBALES_PROCESACONEXIONES = "globals.txt"
-# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante el módulo tseries
+# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante el módulo tseries:
 # de procesaConexiones
 ARCHIVO_FILTROSBPF_PROCESACONEXIONES = "filtrosBpfModuloTseriesProcesaConexiones.txt" 
 # Nombre del archivo de salida donde se almacenan los logs de procesaConexiones
 ARCHIVO_LOGS_PROCESACONEXIONES = "procesaConexiones.log" 
-# Nombre del archivo de entrada de procesaConexiones donde se almacenan las configuraciones que van a aplicarse.
+# Nombre del archivo de entrada de procesaConexiones donde se almacenan las configuraciones que van a aplicarse:
 # Viene definido en config.ini 
 ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES = "" 
-# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante tseries (herramienta)
+# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante tseries (herramienta):
 ARCHIVO_FILTROSBPF_TSERIES = "filtrosBpfTseries.txt"
-# Nombre del archivo que pasa la lista de archivos .gz a procesar a tseries (herramienta)
+# Nombre del archivo que pasa la lista de archivos .gz a procesar a tseries (herramienta):
 ARCHIVO_LISTAGZS_TSERIES = "listaFicherosGzTseries.txt"
+# Nombre del fichero con la salida de tseries (herramienta):
+ARCHIVO_SALIDA_TSERIES = "salidaTseries.txt" 
+# Nombre del fichero con los logs de tseries (herramienta):
+ARCHIVO_LOGS_TSERIES = "tseries.log" 
+# Nombre del archivo índice del disco:
+ARCHIVO_INDICE = "index.json" 
 
 # Columnas a analizar del fichero ARCHIVO_ANALIZADO
 SRCMAC_SRC2DST = 23
@@ -399,8 +405,8 @@ def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
         raise RuntimeError(f"El comando tseries falló: {result.stderr.strip()}")
 
     # 3 - Se guarda resultado en fichero de salida 
-    rutaDestino = os.path.join(directorioOutput, "salidaTseries.txt")
-    rutaLogs = os.path.join(directorioOutput, "tseries.log")
+    rutaDestino = os.path.join(directorioOutput, ARCHIVO_SALIDA_TSERIES)
+    rutaLogs = os.path.join(directorioOutput, ARCHIVO_LOGS_TSERIES)
 
     with open(rutaDestino, "w") as f:
         f.write(result.stdout)
@@ -475,7 +481,7 @@ def extraerDatosGlobals(directorio: str) -> Dict[str, Dict[str, str]]:
         datos[subdir] = {clave: valor for clave, valor in matches}
 
     if len(datos) == 0:
-        raise ValueError("No hay datos globales para index.json") 
+        raise ValueError(f"No hay datos globales para {ARCHIVO_INDICE} ") 
 
     return datos
 
@@ -594,7 +600,7 @@ def generarIndiceDisco(
     datoApendice=extraerDatosGlobals(directorioSalidaPrimerNivel)
     datosCompleto={**datos, **datoApendice}
 
-    rutaIndexJson = os.path.join(directorioSalidaPrimerNivel, "index.json")
+    rutaIndexJson = os.path.join(directorioSalidaPrimerNivel, ARCHIVO_INDICE)
     with open(rutaIndexJson, "w") as f:
         json.dump(datosCompleto, f, indent=4)
 
