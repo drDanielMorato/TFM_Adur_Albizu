@@ -1,158 +1,162 @@
-# Este script se utilizará para generar logs de procesaConexiones. No añado módulos ni nada especial, estoy usando este script para hacer procesamientos sencillos
-# y medir el tiempo   
-# accediendo a los discos montados en los directorios /trazas1, /trazas2 y /trazas3.
-# Los resultados irán al disco limpio en /opt2.
-
-__version__ = "1.0.1"
+# Este script se utilizará para generar registros de flujo mediante procesaConexiones. 
+# ProcesaConexiones se lanzará con sus opciones básicas y una serie de modulos, 
+# los cuales pueden ser configurados a través su archivo de configuraciones (p. ej.ConfiguracionesProcesaConexiones.txt)
+__version__ = "1.2.0"
 
 import subprocess
 import sys
 import time
 import datetime
-import traceback
 import os 
 import argparse
 import mmap
 import logging
 import json
 import re
-import zipfile
-import shutil
 import configparser
 import stat
+from typing import List, Dict, Set, FrozenSet, Tuple
+import shlex
 
-ARCHIVO_ANALIZADO = "salida_udp_" # Archivo analizado para encontrar parejas de macs para tseries
+# Nombre del archivo analizado para encontrar parejas de MACs de la UPNA para tseries
+ARCHIVO_ANALIZADO = "salida_udp_" 
+# Nombre del archivo de salida donde se almacenan las estadísticas de procesaConexiones
+ARCHIVO_GLOBALES_PROCESACONEXIONES = "globals.txt"
+# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante el módulo tseries
+# de procesaConexiones
+ARCHIVO_FILTROSBPF_PROCESACONEXIONES = "filtrosBpfModuloTseriesProcesaConexiones.txt" 
+# Nombre del archivo de salida donde se almacenan los logs de procesaConexiones
+ARCHIVO_LOGS_PROCESACONEXIONES = "procesaConexiones.log" 
+# Nombre del archivo de entrada de procesaConexiones donde se almacenan las configuraciones que van a aplicarse.
+# Viene definido en config.ini 
+ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES = "" 
+# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante tseries (herramienta)
+ARCHIVO_FILTROSBPF_TSERIES = "filtrosBpfTseries.txt"
+# Nombre del archivo que pasa la lista de archivos .gz a procesar a tseries (herramienta)
+ARCHIVO_LISTAGZS_TSERIES = "listaFicherosGzTseries.txt"
 
-# índice de las direcciones MAC en el fichero a analizar. De momento, UDP:
-
+# Columnas a analizar del fichero ARCHIVO_ANALIZADO
 SRCMAC_SRC2DST = 23
 DSTMAC_SRC2DST = 24
 SRCMAC_DST2SRC = 25
 DSTMAC_DST2SRC = 26
 MOREMACSEEN = 27
 
-# obtener configuraciones del config.ini
-RUTA_CONFIGURACIONES_PROCESACONEXIONES = ""
+# Variables que almacenarán las onfiguraciones del config.ini
+RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES = ""
 RUTA_BINARIO_PROCESACONEXIONES = ""
 RUTA_BINARIO_TSERIES = ""     
 RUTA_MODULOS_PROCESACONEXIONES = ""
 
-def parse_args():
+def parseArgs() -> argparse.Namespace:
+    """Parsea y valida los argumentos de la línea de comandos"""
+
     parser = argparse.ArgumentParser(
         description="Ejecuta procesaConexiones y tseries sobre el directorio de montaje del disco indicado. Se debe indicar también el disco donde se almacenarán las trazas resultantes"
     )
 
     parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
+        "--version", "-v", action="version", version=f"%(prog)s {__version__}"
     )
-
-
     parser.add_argument(
         "--rutaOrigen",
+        "-o",
         required=True,
         help="Directorio de montaje del direcorio a procesar (ej: /trazas1)"
     )
     parser.add_argument(
         "--rutaDestino",
+        "-d",
         required=True,
         help="Directorio de montaje del disco donde se van a almacenar los logs (ej: /opt2)"
     )
     parser.add_argument(
         "--rutaConfig",
+        "-c",
         required=True,
         help="Ruta del archivo de configuraciones config.ini (ej: /opt3/Desktop/ScriptProcesado/config.ini)"
     )
 
-    parser.add_argument(
-        "--zip",
-        action="store_true",
-        help="Si se indica, comprime el directorio de resultados en un zip al finalizar"
-    )
-
     return parser.parse_args()
 
-def obtener_serial(directorio):
-    """Obtiene el número de serie del disco montado en el directorio indicado."""
-    try:
-        result = subprocess.run(
-            f'lsblk -no SERIAL $(df -P {directorio} | awk \'NR==2{{print $1}}\' | sed \'s/[0-9]*$//\')',
-            shell=True,
-            capture_output=True,
-            text=True
-        )
+def obtenerSerial(directorio: str) -> str:
+    """Obtiene el número de serie del disco montado en el directorio indicado en --rutaOrigen."""
 
-        if result.returncode != 0:
-            raise RuntimeError(f"El comando falló para {directorio}: {result.stderr.strip()}")
-
-        seriales = result.stdout.strip().splitlines()
-
-        if len(seriales) == 0:
-            raise ValueError(f"No se obtuvo ningún serial para {directorio}")
-
-        if len(seriales) > 1:
-            raise ValueError(f"Se obtuvieron múltiples seriales para {directorio}: {seriales}")
-
-        return seriales[0]
-
-    except ValueError as e:
-        logging.error(f"Valor inesperado: {e}")
-        sys.exit(1)
-    except RuntimeError as e:
-        logging.error(f"Error en la ejecución del comando: {e}")
-        sys.exit(1)
-    except Exception as e:
-        logging.error(f"Error inesperado al obtener serial de {directorio}: {e}")
-        sys.exit(1)
-
-def listarDirectorio(directorio):
-    """ Realiza un simple ls"""
+    directorio_seguro = shlex.quote(directorio)
     result = subprocess.run(
-            f"ls {directorio} ",
+        f'lsblk -no SERIAL $(df -P {directorio_seguro} | awk \'NR==2{{print $1}}\' | sed \'s/[0-9]*$//\')',
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(f"lbslk falló al obtener el serial del disco montado en {directorio}: {result.stderr.strip()}")
+
+    seriales = result.stdout.strip().splitlines()
+
+    if len(seriales) == 0:
+        raise ValueError(f"No se obtuvo ningún serial para {directorio}")
+
+    if len(seriales) > 1:
+        raise ValueError(f"Se obtuvieron múltiples seriales para {directorio}: {seriales}")
+
+    return seriales[0]
+
+def listarDirectorio(directorio: str) -> List[str]:
+    """ Devuelve un array con la lista de subdirectorios de un directorio"""
+    directorio_seguro = shlex.quote(directorio)
+    comando = f"ls {directorio_seguro}"
+    result = subprocess.run(
+            comando,
             shell=True,
             capture_output=True,
             text=True
         )
 
     if result.returncode != 0:
-        raise RuntimeError(f"El comando falló para {directorio}: {result.stderr.strip()}")
+        raise RuntimeError(f"{comando} falló para {directorio}: {result.stderr.strip()}")
 
     return result.stdout.strip().splitlines()
     
-def obtenerTimestamp(directorio):
-    """Obtiene el timestamp del primer pcap del directorio para nombrar el directorio de salida del disco"""
-
+def obtenerTimestamp(directorio: str) -> str:
+    """
+    Obtiene el timestamp del primer pcap del directorio de origen para nombrar el directorio padre de salida 
+    del disco.
+    """
     directorios = listarDirectorio(directorio)
 
     if len(directorios) == 0:
         raise ValueError(f"Directorio {directorio} vacío")
 
+    #Estamos en los directorios superiores, cogemos el de la timestamp más baja 
     directoriosFiltrados = [f for f in directorios if "lost+found" not in f]
-    directoriosFiltrados.sort(key=lambda x: int(x.split('-')[0]))
-    # estamos en los directorios superiores, cogemos el de la timestamp más baja 
+    directoriosFiltrados.sort(key=lambda x: int(x.replace('-', '')))
 
-    directorioObjetivo = directorio + "/" + directoriosFiltrados[0]
-
+    directorioObjetivo = os.path.join(directorio, directoriosFiltrados[0])
     archivosDirectorioObjetivo = listarDirectorio(directorioObjetivo)
     if len(archivosDirectorioObjetivo) == 0:
         raise ValueError(f"Directorio {directorio} vacío")
+
     archivosDirectorioObjetivo.sort(key=lambda x: int(x.split('.')[0]))
 
     return archivosDirectorioObjetivo[0].split(".")[0] #Devuelvo el primer timestamp, sin el gz   
 
-def obtenerTimestampInicio(directorio):
-    """Obtiene el timestamp inicial del disco, basándose en el archivo globals"""
-
+def obtenerTimestampInicio(directorio: str) -> float:
+    """
+    Obtiene el timestamp inicial del disco, basándose en el archivo globals.txt contenido en el directorio
+    de salida.
+    Este valor es utilizado para rellenar el archivo index.json del disco.
+    """
     subdirectorios = listarDirectorio(directorio)
-
     if len(subdirectorios) == 0:
         raise ValueError(f"Directorio {directorio} vacío")
 
     subdirectoriosFiltrados = [f for f in subdirectorios if f.split('-')[0].isdigit()]
-    subdirectoriosFiltrados.sort(key=lambda x: int(x.split('-')[0]))
+    subdirectoriosFiltrados.sort(key=lambda x: int(x.replace('-', '')))
 
-    # cogemos el de la timestamp más bajo 
-    archivoObjetivo = directorio + "/" + subdirectoriosFiltrados[0] + "/globals.txt"
-
+    # Cogemos el globals.txt con el timestamp más bajo 
+    archivoObjetivo = os.path.join(directorio, subdirectoriosFiltrados[0], ARCHIVO_GLOBALES_PROCESACONEXIONES)
     with open(archivoObjetivo, 'r') as f:
         contenido = f.read()
 
@@ -162,9 +166,12 @@ def obtenerTimestampInicio(directorio):
     
     return float(match.group(1))
 
-
-def obtenerTimestampFinal(directorio):
-    """Obtiene el timestamp inicial del disco, basándose en el archivo globals"""
+def obtenerTimestampFinal(directorio: str) -> float:
+    """
+    Obtiene el timestamp final del disco, basándose en el archivo globals.txt contenido en el directorio
+    de salida.
+    Este valor es utilizado para rellenar el archivo index.json del disco.
+    """
 
     subdirectorios = listarDirectorio(directorio)
 
@@ -172,11 +179,10 @@ def obtenerTimestampFinal(directorio):
         raise ValueError(f"Directorio {directorio} vacío")
 
     subdirectoriosFiltrados = [f for f in subdirectorios if f.split('-')[0].isdigit()]
-    subdirectoriosFiltrados.sort(key=lambda x: int(x.split('-')[0]))
+    subdirectoriosFiltrados.sort(key=lambda x: int(x.replace('-', '')))
 
-    # cogemos el de la timestamp más bajo 
-    archivoObjetivo = directorio + "/" + subdirectoriosFiltrados[-1] + "/globals.txt"
-
+    # Cogemos el globals.txt con el timestamp más alto 
+    archivoObjetivo = os.path.join(directorio, subdirectoriosFiltrados[-1], ARCHIVO_GLOBALES_PROCESACONEXIONES)
     with open(archivoObjetivo, 'r') as f:
         contenido = f.read()
 
@@ -186,7 +192,13 @@ def obtenerTimestampFinal(directorio):
     
     return float(match.group(2))
 
-def extract_pcap_filters(input_path, output_path):
+def extraerFiltrosBpfProcesaConexionesYGuardarEnArchivo(input_path: str, output_path: str) -> None:
+    """
+    Este método lista los filtros BPF implementados en el modulo tseries de procesaConexiones
+    en un archivo filtrosBpfModuloTseriesProcesaConexiones.txt, en el directorio de salida.
+    Mientras los filtros no sean numerosos, se puede usar el código actual. Si no, se tendrá que implementar 
+    mmap
+    """
     filters = []
  
     with open(input_path, "r") as f:
@@ -197,64 +209,83 @@ def extract_pcap_filters(input_path, output_path):
                 pcap_filter = line[len(prefix):].strip()
                 filters.append(pcap_filter)
  
-    with open(os.path.join(output_path, "filtrosBpfModuloTseriesProcesaConexiones.txt"), "w") as f:
+    with open(os.path.join(output_path, ARCHIVO_FILTROSBPF_PROCESACONEXIONES), "w") as f:
         for i, pcap_filter in enumerate(filters):
             f.write(f"{i}: {pcap_filter}\n")
 
-def lanzarProcesaConexiones(directorioInput, directorioOutput):
-    
-    logging.info("Inicio lanzarProcesaConexiones")
-    
-    with open(RUTA_CONFIGURACIONES_PROCESACONEXIONES, 'r') as f:
+def prepararFicheroConfiguracionesProcesaConexiones(directorioInput: str, directorioOutput: str) -> str:
+    """
+    Coge la plantilla de configuraciones de procesaConexiones definida en config.ini y la rellena con los parámetros que se le han
+    pasado como entrada a procesar.py, creando el archivo con configuraciones que se le va a pasar a procesaConexiones
+    """
+    with open(RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES, 'r') as f:
         plantilla = f.read()
-
     contenido = plantilla.format(inputDirectory = directorioInput, 
                     outputDirectory = os.path.join(directorioOutput,"salida"),
-                    pathLogFile = os.path.join(directorioOutput, "procesaConexiones.log"),
+                    pathLogFile = os.path.join(directorioOutput, ARCHIVO_LOGS_PROCESACONEXIONES),
                     outputFileModuloTseries = os.path.join(directorioOutput, "salidaModuloTseries"),
                     modulesDirectory = RUTA_MODULOS_PROCESACONEXIONES)
     
-    rutaConfiguracionesProcesaConexiones = os.path.join(directorioOutput, "ConfiguracionesProcesaConexiones.txt")
-
+    rutaConfiguracionesProcesaConexiones = os.path.join(directorioOutput, ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES)
     with open(rutaConfiguracionesProcesaConexiones, 'w') as f:
         f.write(contenido)
 
-    extract_pcap_filters(rutaConfiguracionesProcesaConexiones, directorioOutput)    
+    return rutaConfiguracionesProcesaConexiones
 
-    comando = [RUTA_BINARIO_PROCESACONEXIONES , "--configFile", rutaConfiguracionesProcesaConexiones]
+def extraerEstadisticasGlobalesYGuardarEnArchivo(directorioOutput: str) -> None:
+    """
+    Este método extrae las estadísticas globales de procesaConexiones de su archivo de logs 
+    y lo almacena en el archivo ARCHIVO_GLOBALES_PROCESACONEXIONES del directorio de salida
+    """
 
-    logging.info("Ejecutando comando:")
-    logging.info(" ".join(comando))
-    
-    result = subprocess.run(comando, capture_output=True, text=True)
-
-    with open(os.path.join(directorioOutput, "procesaConexiones.log"), "r") as f:
+    with open(os.path.join(directorioOutput, ARCHIVO_LOGS_PROCESACONEXIONES), "r") as f:
         salida = f.read()
     
     indice = salida.find("numIPFragments=")
-    if indice == -1:
-        raise RuntimeError(f"La lectura de procesaConexiones.log falló")
-
     salida_filtrada = salida[indice:]
+
     limite = salida_filtrada.find("\n")
     if limite != -1:
         salida_filtrada = salida_filtrada[:limite]
 
+    if indice == -1 or limite == -1:
+        raise RuntimeError(f"La lectura de {ARCHIVO_LOGS_PROCESACONEXIONES} falló porque los logs de procesaConexiones no tienen el formato correcto")
+
     # Escribir en el log el contenido con las estadísticas globales:
-    with open(os.path.join(directorioOutput, "globals.txt"), "w") as f:
+    with open(os.path.join(directorioOutput, ARCHIVO_GLOBALES_PROCESACONEXIONES), "w") as f:
         f.write(salida_filtrada)
+
+def lanzarProcesaConexiones(directorioInput: str, directorioOutput: str) -> None:
+    """
+    Lanza procesaConexiones, implementando las configuraciones del archivo de configuraciones de procesaConexiones.
+    """
+    logging.info("Inicio lanzarProcesaConexiones")
+
+    #1- Preparamos el archivo de configuraciones que le llega como input a procesaConexiones
+    rutaConfiguracionesProcesaConexiones = prepararFicheroConfiguracionesProcesaConexiones(
+        directorioInput, directorioOutput
+    )   
+
+    #2- Ejecución de procesaConexiones: 
+    comando = [RUTA_BINARIO_PROCESACONEXIONES , "--configFile", rutaConfiguracionesProcesaConexiones]
+    logging.info("Ejecutando comando:")
+    logging.info(" ".join(comando))
+    result = subprocess.run(comando, capture_output=True, text=True)
 
     if result.returncode != 0:
         raise RuntimeError(f"El comando procesaConexiones falló: {result.stderr.strip()}")
-    # print(result)
+
+    #3- Creamos archivos en el directorio de salida con los filtros BPF aplicados y las estadísticas globales de procesaConexiones    
+    extraerFiltrosBpfProcesaConexionesYGuardarEnArchivo(rutaConfiguracionesProcesaConexiones, directorioOutput)
+    extraerEstadisticasGlobalesYGuardarEnArchivo(directorioOutput)
 
     logging.info("Fin lanzarProcesaConexiones")
 
-def obtenerParejasMACs(directorioOutput):
-    # Lanzo esto para obtener las parejas de macs del log salida_udp
-    # Es clave para obtener lls flujos de entrada/salida en la red
-
-    archivoAnalizado = directorioOutput + "/" + ARCHIVO_ANALIZADO
+def obtenerParejasMACs(directorioOutput: str) -> Set[FrozenSet[str]]:
+    """
+    Lanzo esto para obtener las parejas de macs del log ARCHIVO_ANALIZADO de procesaConexiones
+    """
+    archivoAnalizado = os.path.join(directorioOutput, ARCHIVO_ANALIZADO)
     parejas = set()
 
     logging.info(f"Se inicia procesado de {archivoAnalizado}...")
@@ -289,7 +320,10 @@ def obtenerParejasMACs(directorioOutput):
     logging.info(f"finaliza procesado de {archivoAnalizado}. Parejas MAC halladas: {parejas}")
     return parejas
 
-def generar_filtros_bpf(mac):
+def generarFiltrosBpf(mac: str) -> str:
+    """
+    Rellena una plantilla de filtros BPF con las dirección MAC que se le ha proporcionado
+    """
     plantilla = """ether src {mac}
 ether src {mac} and ip proto 1
 ether src {mac} and ip proto 6
@@ -312,63 +346,74 @@ ether src {mac} and ip6
 ether src {mac} and ip6 and not (ip6 proto 58 or ip6 proto 6 or ip6 proto 17)"""
     return plantilla.format(mac=mac)
 
-def crearArchivoFiltrosBPF(directorioOutput):
-    #Creo un archivo listando todos los filtros BPF y lo dejo a la vista 
-    #en el directorio de salida.  
+def crearArchivoFiltrosBPF(directorioOutput: str) -> str:
+    """
+    Crea un archivo listando todos los filtros BPF que se le van a aplicar a tseries (herramienta)
+    y los almacena en un archivo ARCHIVO_FILTROSBPF_TSERIES en el directorio de salida.
+    El archivo permanece después de la ejecución como prueba.
+    """
     parejasMacs = obtenerParejasMACs(directorioOutput)
-    ruta = os.path.join(directorioOutput, "filtrosBpfTseries.txt")
+    ruta = os.path.join(directorioOutput, ARCHIVO_FILTROSBPF_TSERIES)
 
     with open(ruta, "w") as f:
-        for pareja in parejasMacs:
+        for pareja in sorted(parejasMacs, key=lambda p: sorted(p)):
             for mac in pareja:
-                f.write(generar_filtros_bpf(mac))
+                f.write(generarFiltrosBpf(mac))
                 f.write("\n")
 
     logging.info(f"Filtros BPF escritos en: {ruta}")
     return ruta
 
-def crearFicheroListaGz(directorioInput, directorioOutput):
-    #Creo archivo que guarda la lista de .gzs a procesar, ordenada en base a los timestamps
-    
+def crearFicheroListaGz(directorioInput: str, directorioOutput: str) -> str:
+    """
+    Creo archivo que guarda la lista de .gzs a procesar por tseries (herramienta), ordenada en base a los
+    timestamps, y lo almacena en el directorio de salida
+    """
     files = os.listdir(directorioInput)
     files.sort(key=lambda x: int(x.split('.')[0]))
 
-    ruta = os.path.join(directorioOutput, "listaFicherosGzTseries.txt")
+    ruta = os.path.join(directorioOutput, ARCHIVO_LISTAGZS_TSERIES)
     with open(ruta, "w") as f:
         for filename in files:
             f.write(os.path.join(directorioInput, filename))
             f.write("\n")
     return ruta
 
-
-def lanzarTseries(directorioInput, directorioOutput):
-    #Sirve para lanzar tseries contra las parejas de MACs halladas en los logs de procesaConexiones 
+def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
+    """
+    Ejecución de tseries
+    """
     logging.info("Inicio lanzarTseries")
 
+    # 1- Preparamos archivos que tseries (herramienta) necesita
     rutaFiltros = crearArchivoFiltrosBPF(directorioOutput)
     rutaLista = crearFicheroListaGz(directorioInput, directorioOutput)
-    rutaDestino = os.path.join(directorioOutput, "salidaTseries.txt")
-    rutaLogs = os.path.join(directorioOutput, "tseries.log")
-
+    
+    # 2 - Ejecutamos tseries 
     tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros]
     result = subprocess.run(tseries_comand, capture_output=True, text=True)
-
     logging.info("Ejecutando comando:")
     logging.info(" ".join(tseries_comand))
 
     if result.returncode != 0:
-        logging.warning(f"tseries ha fallado. Leer logs en: {rutaLogs}")
+        raise RuntimeError(f"El comando tseries falló: {result.stderr.strip()}")
+
+    # 3 - Se guarda resultado en fichero de salida 
+    rutaDestino = os.path.join(directorioOutput, "salidaTseries.txt")
+    rutaLogs = os.path.join(directorioOutput, "tseries.log")
 
     with open(rutaDestino, "w") as f:
         f.write(result.stdout)
-
     with open(rutaLogs, "w") as f:
         f.write(result.stderr)
 
     logging.info(f"tseries lanzado satisfactoriamente. Resultados en: {rutaDestino}")
     logging.info("Fin lanzarTseries")
 
-def configurarLogger(directorioDestino):
+def configurarLogger(directorioDestino: str) -> None:
+    """
+    Aquí se configura el logger: ruta de los logs resultantes, formato, fecha...
+    """
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     logging.basicConfig(
         level=logging.INFO,
@@ -380,7 +425,10 @@ def configurarLogger(directorioDestino):
         ]
     )
 
-def timestamp2Duration(ts):
+def timestamp2Duration(ts: str) -> str:
+    """
+    Transformación de timestamp a formato legible
+    """
     ts = float(ts)
     dias = int(ts // 86400)
     horas = int((ts % 86400) // 3600)
@@ -390,10 +438,11 @@ def timestamp2Duration(ts):
 
     return f"{dias}d {horas:02d}:{minutos:02d}:{segundos:02d}.{milisegundos:03d}"
 
-def obtenerUsoMemoria(directorio):
+def obtenerUsoMemoria(directorio: str) -> List[str]:
     """Obtiene la memoria usada/libre del disco indicado"""
+    directorio_seguro = shlex.quote(directorio)
     result = subprocess.run(
-        f"df -B1 {directorio} | awk 'NR==2{{print $3,$4}}'",
+        f"df -B1 {directorio_seguro} | awk 'NR==2{{print $3,$4}}'",
         shell=True,
         capture_output=True,
         text=True
@@ -403,14 +452,12 @@ def obtenerUsoMemoria(directorio):
         raise RuntimeError(f"El comando de extracción de datos de almacenamiento falló para {directorio}: {result.stderr.strip()}")
 
     datos = result.stdout.strip().split()
-
     if len(datos) == 0:
         raise ValueError(f"No se obtuvo ningún dato de almacenamiento para el disco montado en {directorio}")
    
     return datos
 
-
-def extraerDatosGlobals(directorio):
+def extraerDatosGlobals(directorio: str) -> Dict[str, Dict[str, str]]: 
     """Obtiene todas las variables de todos los globals.txt y las devuelve en un diccionario"""
     subdirectorios = listarDirectorio(directorio)
     subdirectoriosFiltrados = [f for f in subdirectorios if f.split('-')[0].isdigit()]
@@ -420,7 +467,7 @@ def extraerDatosGlobals(directorio):
 
     datos = {}
     for subdir in subdirectoriosFiltrados:
-        archivoObjetivo = directorio + "/" + subdir + "/globals.txt"
+        archivoObjetivo = os.path.join(directorio, subdir, ARCHIVO_GLOBALES_PROCESACONEXIONES)
         with open(archivoObjetivo, 'r') as f:
             contenido = f.read()
 
@@ -428,19 +475,22 @@ def extraerDatosGlobals(directorio):
         datos[subdir] = {clave: valor for clave, valor in matches}
 
     if len(datos) == 0:
-        logging.warning("No hay datos globales para index.json") 
+        raise ValueError("No hay datos globales para index.json") 
 
-    # print(datos)
     return datos
 
-def lanzarProcesados(directorios, directorioSalidaPrimerNivel, directorioOrigen):
-    # Lanza tseries y procesaConexiones para cada directorio del disco original, almacenando
-    # los resultados en directorios espejo dentro del directorio original
+def imprimirComandoScriptProcesar() -> None:
+    logging.info("Comando procesar.py ejecutado:")
+    logging.info(' '.join(sys.argv))
 
+def lanzarProcesados(directorios: List[str], directorioSalidaPrimerNivel: str, directorioOrigen: str) -> None:
+    """
+    Lanza tseries y procesaConexiones para cada directorio del disco original, almacenando
+    los resultados en directorios espejo dentro del directorio original
+    """
     imprimirComandoScriptProcesar()
     
     directoriosFiltrados = [f for f in directorios if "lost+found" not in f]
-
     for d in directoriosFiltrados:
         directorioInput = os.path.join(directorioOrigen, d)
         directorioOutput = os.path.join(directorioSalidaPrimerNivel, d)
@@ -455,7 +505,10 @@ def lanzarProcesados(directorios, directorioSalidaPrimerNivel, directorioOrigen)
     logging.info(f"{directorioOrigen} procesado satisfactoriamente")
     logging.info(f"Resultado en: {directorioSalidaPrimerNivel}")
 
-def make_readonly(path):
+def makeReadonly(path: str) -> None:
+    """
+    Convierte el directorio que se le proporciona en readonly
+    """
     for dirpath, dirnames, filenames in os.walk(path):
         for filename in filenames:
             filepath = os.path.join(dirpath, filename)
@@ -465,120 +518,124 @@ def make_readonly(path):
         current = os.stat(dirpath).st_mode
         os.chmod(dirpath, current & ~stat.S_IWUSR & ~stat.S_IWGRP & ~stat.S_IWOTH)
 
-def obtenerValoresDelConfig(rutaConfig):
-    global RUTA_CONFIGURACIONES_PROCESACONEXIONES, RUTA_BINARIO_PROCESACONEXIONES, RUTA_BINARIO_TSERIES, RUTA_MODULOS_PROCESACONEXIONES
+def obtenerValoresDelConfig(rutaConfig: str) -> None:
+    """
+    Extrae los valores de las configuraciones del archivo proporcionado en --rutaConfig
+    """
+    global RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES, RUTA_BINARIO_PROCESACONEXIONES, RUTA_BINARIO_TSERIES, RUTA_MODULOS_PROCESACONEXIONES, ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES
 
     config = configparser.ConfigParser()
     config.read(rutaConfig)
 
-    RUTA_CONFIGURACIONES_PROCESACONEXIONES = config['rutas']['rutaConfiguracionesProcesaConexiones'] 
+    RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES = config['rutas']['rutaPlantillaConfiguracionesProcesaConexiones'] 
     RUTA_BINARIO_PROCESACONEXIONES = config['rutas']['rutaBinarioProcesaConexiones']
     RUTA_BINARIO_TSERIES = config['rutas']['rutaBinarioTseries']      
     RUTA_MODULOS_PROCESACONEXIONES = config['rutas']['rutaModulosProcesaConexiones']
 
-def imprimirComandoScriptProcesar():
-    logging.info("Comando procesar.py ejecutado:")
-    logging.info(' '.join(sys.argv))
+    ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES = os.path.basename(RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES)
 
-def main():
-    
-    args = parse_args()
+def prepararEntorno(args: argparse.Namespace) -> Tuple[str, str, List[str]]:
+    """
+    Prepara el entorno de ejecución: lee argumentos de entrada, lee config, calcula directorio de
+    salida de primer nivel, crea el logger y valida que haya datos.
+
+    Devuelve directorioSalidaPrimerNivel, serial_trazas y la lista directorios.
+    """
+    directorioOrigen = args.rutaOrigen
+    directorioDestino = args.rutaDestino   
+    rutaConfig = args.rutaConfig
+
+    obtenerValoresDelConfig(rutaConfig)
+
+    serial_trazas =  obtenerSerial(directorioOrigen) # "mockeo" #  
+    primerTimestamp = obtenerTimestamp(directorioOrigen)
+
+    nombreDirectorioSalidaPrimerNivel = f"{serial_trazas}_{primerTimestamp}"
+    directorioSalidaPrimerNivel = os.path.join(
+        directorioDestino, nombreDirectorioSalidaPrimerNivel
+    )
+    os.makedirs(directorioSalidaPrimerNivel, exist_ok=True)  # Crear antes del logger
+
+    configurarLogger(directorioSalidaPrimerNivel)
+
+    directorios = listarDirectorio(directorioOrigen)
+    if len(directorios) == 0:
+        raise ValueError(f"Directorio {directorioOrigen} vacío")
+
+    return directorioSalidaPrimerNivel, serial_trazas, directorios
+
+def generarIndiceDisco(
+    directorioSalidaPrimerNivel: str,
+    directorioDestino: str,
+    serial_trazas: str,
+    directorios: List[str],
+) -> str:
+    """
+    Calcula los datos de resumen del procesado y los escribe en index.json.
+    Devuelve la ruta del index.json generado.
+    """
+    timestampInicial = obtenerTimestampInicio(directorioSalidaPrimerNivel)
+    timestampFinal = obtenerTimestampFinal(directorioSalidaPrimerNivel)
+    duracion = timestampFinal - timestampInicial
+    usoMemoria = obtenerUsoMemoria(directorioDestino)
+
+    datos = {
+        "numeroSerie": serial_trazas,
+        "directorios": directorios,
+        "usado" : usoMemoria[0],
+        "disponible" : usoMemoria[1],  
+        "timestampInicio": timestampInicial,
+        "timestampFinal": timestampFinal,
+        "diferenciaTimestamps" : duracion,
+        "fechaInicio" : datetime.datetime.fromtimestamp(timestampInicial).strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "fechaFinal": datetime.datetime.fromtimestamp(timestampFinal).strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "tiempoTranscurrido": timestamp2Duration(duracion)
+    }
+    datoApendice=extraerDatosGlobals(directorioSalidaPrimerNivel)
+    datosCompleto={**datos, **datoApendice}
+
+    rutaIndexJson = os.path.join(directorioSalidaPrimerNivel, "index.json")
+    with open(rutaIndexJson, "w") as f:
+        json.dump(datosCompleto, f, indent=4)
+
+    logging.info(f"Índice del disco escrito en {rutaIndexJson}")
+    return  rutaIndexJson
+
+def main() -> None:
+    """
+    Flujo principal
+    """
+    args = parseArgs()
+    start = time.time()
 
     try:
-        start = time.time()
-
         # 1 - Preparación previa al procesado
-
-        directorioOrigen = args.rutaOrigen
-        directorioDestino = args.rutaDestino   
-        rutaConfig = args.rutaConfig
-
-        obtenerValoresDelConfig(rutaConfig)
-
-        serial_trazas = obtener_serial(directorioOrigen) # "mockeo" #  
-        primerTimestamp = obtenerTimestamp(directorioOrigen)
-        nombreDirectorioSalidaPrimerNivel = f"{serial_trazas}_{primerTimestamp}"
-        directorioSalidaPrimerNivel = os.path.join(directorioDestino, nombreDirectorioSalidaPrimerNivel)
-
-        os.makedirs(directorioSalidaPrimerNivel, exist_ok=True)  # Crear antes del logger
-        configurarLogger(directorioSalidaPrimerNivel)
-
-        directorios = listarDirectorio(directorioOrigen)
-        if len(directorios) == 0:
-            raise ValueError(f"Directorio {directorioOrigen} vacío")
+        directorioSalidaPrimerNivel, serial_trazas, directorios = (
+            prepararEntorno(args)
+        )
 
         # 2 - Procesado: 
-        lanzarProcesados(directorios, directorioSalidaPrimerNivel, directorioOrigen)
+        lanzarProcesados(directorios, directorioSalidaPrimerNivel, args.rutaOrigen)
 
         # 3 - Preparar y guardar index del disco, a modo de resumen del disco/procesado. 
-        
-        timestampInicial = obtenerTimestampInicio(directorioSalidaPrimerNivel)
-        timestampFinal = obtenerTimestampFinal(directorioSalidaPrimerNivel)
-        duracion = timestampFinal - timestampInicial
-
-        usoMemoria = obtenerUsoMemoria(directorioDestino)
-
-        datos = {
-            "numeroSerie": serial_trazas,
-            "directorios": directorios,
-            "usado" : usoMemoria[0],
-            "disponible" : usoMemoria[1],  
-            "timestampInicio": timestampInicial,
-            "timestampFinal": timestampFinal,
-            "diferenciaTimestamps" : duracion,
-            "fechaInicio" : datetime.datetime.fromtimestamp(timestampInicial).strftime("%Y-%m-%d %H:%M:%S.%f"),
-            "fechaFinal": datetime.datetime.fromtimestamp(timestampFinal).strftime("%Y-%m-%d %H:%M:%S.%f"),
-            "tiempoTranscurrido": timestamp2Duration(duracion)
-        }
-
-        datoApendice=extraerDatosGlobals(directorioSalidaPrimerNivel)
-        datosCompleto={**datos, **datoApendice}
-
-        rutaIndexJson = os.path.join(directorioSalidaPrimerNivel, "index.json")
-        with open(rutaIndexJson, "w") as f:
-            json.dump(datosCompleto, f, indent=4)
-
-        logging.info(f"Índice del disco escrito en {rutaIndexJson}")
+        generarIndiceDisco(
+            directorioSalidaPrimerNivel,
+            args.rutaDestino,
+            serial_trazas,
+            directorios,
+        )
 
         # 4 - Convertir el directorio de salida no editable para evitar corromper datos 
-        make_readonly(directorioSalidaPrimerNivel)
-
-        # Comprimo todo en un zip:
-
-        # if args.zip:
-
-        #     inicioCompresion = time.time()
-        #     logging.info(f"Comprimiendo resultados en {directorioSalidaPrimerNivel}.zip ...")
-
-        #     ruta_zip = directorioSalidaPrimerNivel + ".zip"
-
-        #     with zipfile.ZipFile(ruta_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
-        #         for root, dirs, files in os.walk(directorioSalidaPrimerNivel):
-        #             for file in files:
-        #                 ruta_absoluta = os.path.join(root, file)
-        #                 ruta_relativa = os.path.relpath(ruta_absoluta, directorioSalidaPrimerNivel)
-        #                 zf.write(ruta_absoluta, ruta_relativa)
-
-        #     logging.info(f"Zip creado en: {ruta_zip}")
-
-        #     # Borro el original
-        #     shutil.rmtree(directorioSalidaPrimerNivel)
-        #     logging.info(f"Directorio original eliminado: {directorioSalidaPrimerNivel}")
-
-        #     endCompresion = time.time()
-        #     tiempo_total = str(datetime.timedelta(seconds=endCompresion-inicioCompresion))
-        #     logging.info(f"Tiempo total de compresión (H:MM:SS.MM): {tiempo_total}")
+        makeReadonly(directorioSalidaPrimerNivel)
 
     except Exception as e:
-        logging.error(f"Fallo inesperado en el script: {e}")
-        logging.error(f"Stack trace:\n{traceback.format_exc()}")
+        logging.error(f"Fallo inesperado en el script: {e}", exc_info=True)
         sys.exit(1)
 
     finally:
         end = time.time()
         tiempo_total = str(datetime.timedelta(seconds=end-start))
         logging.info(f"Tiempo total de ejecución (H:MM:SS.MM): {tiempo_total}")
-
 
 if __name__ == "__main__":
     main()
