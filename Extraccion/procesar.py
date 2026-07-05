@@ -18,8 +18,12 @@ import stat
 from typing import List, Dict, Set, FrozenSet, Tuple
 import shlex
 
+# Archivos de salida de procesaConexiones:
+ARCHIVO_TCP = "salida_tcp_"
+ARCHIVO_UDP = "salida_udp_"
+ARCHIVO_ICMP = "salida_icmp_"
 # Nombre del archivo analizado para encontrar parejas de MACs de la UPNA para tseries:
-ARCHIVO_ANALIZADO = "salida_udp_" 
+ARCHIVO_ANALIZADO = ARCHIVO_UDP 
 # Nombre del archivo de salida donde se almacenan las estadísticas de procesaConexiones:
 ARCHIVO_GLOBALES_PROCESACONEXIONES = "globals.txt"
 # Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante el módulo tseries:
@@ -30,8 +34,9 @@ ARCHIVO_LOGS_PROCESACONEXIONES = "procesaConexiones.log"
 # Nombre del archivo de entrada de procesaConexiones donde se almacenan las configuraciones que van a aplicarse:
 # Viene definido en config.ini 
 ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES = "" 
-# Nombre del archivo de salida donde se almacenan los filtros BPF implementados mediante tseries (herramienta):
+# Nombre del archivo de salida donde se almacenan los filtros implementados mediante tseries:
 ARCHIVO_FILTROSBPF_TSERIES = "filtrosBpfTseries.txt"
+ARCHIVO_FILTROSNETS_TSERIES = "filtrosNETsTseries.txt"
 # Nombre del archivo que pasa la lista de archivos .gz a procesar a tseries (herramienta):
 ARCHIVO_LISTAGZS_TSERIES = "listaFicherosGzTseries.txt"
 # Nombre del fichero con la salida de tseries (herramienta):
@@ -326,6 +331,70 @@ def obtenerParejasMACs(directorioOutput: str) -> Set[FrozenSet[str]]:
     logging.info(f"finaliza procesado de {archivoAnalizado}. Parejas MAC halladas: {parejas}")
     return parejas
 
+def obtener_IPs(directorioOutput):
+    """
+    Devuelve un set con las direcciones IP asociadas a la direccion MAC del router de la UPNA.
+
+    - Si la columna 78 es "00:41:d2:9b:d6:ef", añade el valor de la columna 1.
+    - Si la columna 80 es "00:41:d2:9b:d6:ef", añade el valor de la columna 3.
+
+    Las columnas se numeran desde 0.
+    """
+
+    macUPNA = "00:41:d2:9b:d6:ef"
+    valores = set()
+
+    ruta_fichero = os.path.join(directorioOutput, ARCHIVO_TCP)
+    with open(ruta_fichero, "r") as f:
+        for linea in f:
+            columnas = linea.split()
+
+            # Comprobar que la línea tiene suficientes columnas
+            if len(columnas) > 80:
+                if columnas[78] == macUPNA:
+                    valores.add(columnas[0])
+
+                if columnas[80] == macUPNA:
+                    valores.add(columnas[2])
+        f.close()
+
+    ruta_fichero = os.path.join(directorioOutput, ARCHIVO_UDP)
+    with open(ruta_fichero, "r") as f:
+        for linea in f:
+            columnas = linea.split()
+
+            # Comprobar que la línea tiene suficientes columnas
+            if len(columnas) > 25:
+                if columnas[23] == macUPNA:
+                    valores.add(columnas[0])
+
+                if columnas[25] == macUPNA:
+                    valores.add(columnas[2])
+
+    ruta_fichero = os.path.join(directorioOutput, ARCHIVO_ICMP)
+    with open(ruta_fichero, "r") as f:
+        for linea in f:
+            columnas = linea.split()
+
+            # Comprobar que la línea tiene suficientes columnas
+            if len(columnas) > 23:
+                if columnas[21] == macUPNA:
+                    valores.add(columnas[0])
+
+                if columnas[23] == macUPNA:
+                    valores.add(columnas[2])
+
+    return valores
+     
+def generarFiltrosNETs(ip: str) -> str:
+    """
+    Rellena una plantilla de filtros NET con las dirección IP que se le ha proporcionado
+    """
+    plantilla = """ether src {mac}
+{ip} 255.255.255.255 0.0.0.0 0.0.0.0
+0.0.0.0 0.0.0.0 {ip} 255.255.255.255}"""
+    return plantilla.format(ip=ip)
+    
 def generarFiltrosBpf(mac: str) -> str:
     """
     Rellena una plantilla de filtros BPF con las dirección MAC que se le ha proporcionado
@@ -354,7 +423,7 @@ ether src {mac} and ip6 and not (ip6 proto 58 or ip6 proto 6 or ip6 proto 17)"""
 
 def crearArchivoFiltrosBPF(directorioOutput: str) -> str:
     """
-    Crea un archivo listando todos los filtros BPF que se le van a aplicar a tseries (herramienta)
+    Crea un archivo listando todos los filtros NETs que se le van a aplicar a tseries (herramienta)
     y los almacena en un archivo ARCHIVO_FILTROSBPF_TSERIES en el directorio de salida.
     El archivo permanece después de la ejecución como prueba.
     """
@@ -368,6 +437,23 @@ def crearArchivoFiltrosBPF(directorioOutput: str) -> str:
                 f.write("\n")
 
     logging.info(f"Filtros BPF escritos en: {ruta}")
+    return ruta
+
+def crearArchivoFiltrosNETs(directorioOutput: str) -> str:
+    """
+    Crea un archivo listando todos los filtros NETs que se le van a aplicar a tseries (herramienta)
+    y los almacena en un archivo ARCHIVO_FILTROSNETS_TSERIES en el directorio de salida.
+    El archivo permanece después de la ejecución como prueba.
+    """
+    ips = obtener_IPs(directorioOutput)
+    ruta = os.path.join(directorioOutput, ARCHIVO_FILTROSNETS_TSERIES)
+
+    with open(ruta, "w") as f:
+        for ip in sorted(ips, key=lambda p: sorted(p)):
+            f.write(generarFiltrosNETs(ip))
+            f.write("\n")
+
+    logging.info(f"Filtros NETs escritos en: {ruta}")
     return ruta
 
 def crearFicheroListaGz(directorioInput: str, directorioOutput: str) -> str:
@@ -392,11 +478,13 @@ def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
     logging.info("Inicio lanzarTseries")
 
     # 1- Preparamos archivos que tseries (herramienta) necesita
-    rutaFiltros = crearArchivoFiltrosBPF(directorioOutput)
+    #rutaFiltros = crearArchivoFiltrosBPF(directorioOutput)
+    rutaFiltros = crearArchivoFiltrosNETs(directorioOutput)
     rutaLista = crearFicheroListaGz(directorioInput, directorioOutput)
     
     # 2 - Ejecutamos tseries 
-    tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros]
+    #tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros]
+    tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros, "-N"]
     result = subprocess.run(tseries_comand, capture_output=True, text=True)
     logging.info("Ejecutando comando:")
     logging.info(" ".join(tseries_comand))
@@ -606,6 +694,10 @@ def generarIndiceDisco(
 
     logging.info(f"Índice del disco escrito en {rutaIndexJson}")
     return  rutaIndexJson
+
+
+
+
 
 def main() -> None:
     """
