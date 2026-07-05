@@ -390,9 +390,7 @@ def generarFiltrosNETs(ip: str) -> str:
     """
     Rellena una plantilla de filtros NET con las dirección IP que se le ha proporcionado
     """
-    plantilla = """ether src {mac}
-{ip} 255.255.255.255 0.0.0.0 0.0.0.0
-0.0.0.0 0.0.0.0 {ip} 255.255.255.255}"""
+    plantilla = """{ip} 255.255.255.255 0.0.0.0 0.0.0.0\n0.0.0.0 0.0.0.0 {ip} 255.255.255.255"""
     return plantilla.format(ip=ip)
     
 def generarFiltrosBpf(mac: str) -> str:
