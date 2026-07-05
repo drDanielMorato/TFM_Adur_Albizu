@@ -1,7 +1,7 @@
 # Este script se utilizará para generar registros de flujo mediante procesaConexiones. 
 # ProcesaConexiones se lanzará con sus opciones básicas y una serie de modulos, 
 # los cuales pueden ser configurados a través su archivo de configuraciones (p. ej.ConfiguracionesProcesaConexiones.txt)
-__version__ = "1.2.1"
+__version__ = "1.3.0"
 
 import subprocess
 import sys
