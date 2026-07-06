@@ -382,7 +382,7 @@ def obtener_IPs(directorioOutput):
                     valores.add(columnas[0])
 
                 if columnas[23] == macUPNA:
-                    valores.add(columnas[2])
+                    valores.add(columnas[1])
 
     return valores
      
@@ -476,10 +476,12 @@ def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
     logging.info("Inicio lanzarTseries")
 
     # 1- Preparamos archivos que tseries (herramienta) necesita
+    logging.info("Construyendo los filtros...")
     #rutaFiltros = crearArchivoFiltrosBPF(directorioOutput)
     rutaFiltros = crearArchivoFiltrosNETs(directorioOutput)
+    logging.info("Filtros listos")
     rutaLista = crearFicheroListaGz(directorioInput, directorioOutput)
-    
+
     # 2 - Ejecutamos tseries 
     #tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros]
     tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros, "-N"]
