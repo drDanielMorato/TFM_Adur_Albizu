@@ -368,7 +368,7 @@ def imprimir_resultado(conversaciones: dict) -> None:
                     f" {len({c[3] for c in conv.conexiones}):^12}"
                     f" {puertoDestino}"
                     f"\n"
-                ))
+                )) 
 
 def manejarArgumentos(args) -> None:
     global INPUT_PATH, OUTPUT_PATH
