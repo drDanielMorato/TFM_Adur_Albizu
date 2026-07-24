@@ -1,7 +1,7 @@
 # Este script se utilizará para generar registros de flujo mediante procesaConexiones. 
 # ProcesaConexiones se lanzará con sus opciones básicas y una serie de modulos, 
 # los cuales pueden ser configurados a través su archivo de configuraciones (p. ej.ConfiguracionesProcesaConexiones.txt)
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 import subprocess
 import sys
@@ -17,6 +17,7 @@ import configparser
 import stat
 from typing import List, Dict, Set, FrozenSet, Tuple
 import shlex
+import ipaddress
 
 # Archivos de salida de procesaConexiones:
 ARCHIVO_TCP = "salida_tcp_"
@@ -58,6 +59,7 @@ RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES = ""
 RUTA_BINARIO_PROCESACONEXIONES = ""
 RUTA_BINARIO_TSERIES = ""     
 RUTA_MODULOS_PROCESACONEXIONES = ""
+REDESUPNA = []  # Objetos ipaddress.IPv4Network con las subredes de la UPNA
 
 def parseArgs() -> argparse.Namespace:
     """Parsea y valida los argumentos de la línea de comandos"""
@@ -243,6 +245,32 @@ def prepararFicheroConfiguracionesProcesaConexiones(directorioInput: str, direct
 
     return rutaConfiguracionesProcesaConexiones
 
+def prepararFicheroConfiguracionesProcesaConexionesSeries(directorioInput: str, directorioOutput: str) -> str:
+    """
+    Coge la plantilla de configuraciones de procesaConexiones definida en config.ini y la rellena con los parámetros que se le han
+    pasado como entrada a procesar.py, creando el archivo con configuraciones que se le va a pasar a procesaConexiones para calcular series temporales
+    """
+    #POR HACER
+    with open(RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES_SERIES, 'r') as f:
+        plantilla = f.read()
+    contenido = plantilla.format(inputDirectory = directorioInput, 
+                    outputDirectory = os.path.join(directorioOutput,"salida"),
+                    pathLogFile = os.path.join(directorioOutput, ARCHIVO_LOGS_PROCESACONEXIONES),
+                    outputFileModuloTseries = os.path.join(directorioOutput, "salidaModuloTseries"),
+                    modulesDirectory = RUTA_MODULOS_PROCESACONEXIONES)
+    
+    direcciones = obtener_IPs(directorioOutput)
+    for ip in direcciones:
+        contenido += f"--externArgs tseries:pcapFilter=ip and src host {ip}\n"
+        contenido += f"--externArgs tseries:pcapFilter=ip and dst host {ip}\n"
+        
+    rutaConfiguracionesProcesaConexiones = os.path.join(directorioOutput, ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES)
+    rutaConfiguracionesProcesaConexiones += "_soloSeries"
+    with open(rutaConfiguracionesProcesaConexiones, 'w') as f:
+        f.write(contenido)
+
+    return rutaConfiguracionesProcesaConexiones
+
 def extraerEstadisticasGlobalesYGuardarEnArchivo(directorioOutput: str) -> None:
     """
     Este método extrae las estadísticas globales de procesaConexiones de su archivo de logs 
@@ -276,6 +304,32 @@ def lanzarProcesaConexiones(directorioInput: str, directorioOutput: str) -> None
     rutaConfiguracionesProcesaConexiones = prepararFicheroConfiguracionesProcesaConexiones(
         directorioInput, directorioOutput
     )   
+
+    #2- Ejecución de procesaConexiones: 
+    comando = [RUTA_BINARIO_PROCESACONEXIONES , "--configFile", rutaConfiguracionesProcesaConexiones]
+    logging.info("Ejecutando comando:")
+    logging.info(" ".join(comando))
+    result = subprocess.run(comando, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        raise RuntimeError(f"El comando procesaConexiones falló: {result.stderr.strip()}")
+
+    #3- Creamos archivos en el directorio de salida con los filtros BPF aplicados y las estadísticas globales de procesaConexiones    
+    extraerFiltrosBpfProcesaConexionesYGuardarEnArchivo(rutaConfiguracionesProcesaConexiones, directorioOutput)
+    extraerEstadisticasGlobalesYGuardarEnArchivo(directorioOutput)
+
+    logging.info("Fin lanzarProcesaConexiones")
+    
+def lanzarProcesaConexionesSeries(directorioInput: str, directorioOutput: str) -> None:
+    """
+    Lanza procesaConexiones para calcular series temporales
+    """
+    logging.info("Inicio lanzarProcesaConexiones")
+
+    #1- Preparamos el archivo de configuraciones que le llega como input a procesaConexiones
+    rutaConfiguracionesProcesaConexiones = prepararFicheroConfiguracionesProcesaConexionesSeries(
+        directorioInput, directorioOutput
+    )
 
     #2- Ejecución de procesaConexiones: 
     comando = [RUTA_BINARIO_PROCESACONEXIONES , "--configFile", rutaConfiguracionesProcesaConexiones]
@@ -331,22 +385,94 @@ def obtenerParejasMACs(directorioOutput: str) -> Set[FrozenSet[str]]:
     logging.info(f"finaliza procesado de {archivoAnalizado}. Parejas MAC halladas: {parejas}")
     return parejas
 
+
+def esIP_UPNA(direccion):
+    ip = ipaddress.IPv4Address(direccion)
+    for subred in REDESUPNA:
+        if ip in subred:
+            return True
+    return False
+
+
+def obtener_MACs(directorioOutput):
+    """
+    Obtener las direcciones MAC de los routers.
+    Para ello coge las MACs de los primeros flujos TCP.
+    Toma como UPNA la que en los paquetes src2dst haya estado en el lado de la IP UPNA
+    Toma como Externa la MAC que en los paquetes src2dst haya estado en el lado de la UP no-UPNA
+    """
+    logging.info("Buscando las MACs de los routers")
+    NumFlujosMirar = 20
+    
+    macsUPNA = set()
+    macsExternas = set()
+    
+    # Cojo unas cuantas líneas del fichero de flujos TCP para buscar las MACs
+    ruta_fichero = os.path.join(directorioOutput, ARCHIVO_TCP)
+    with open(ruta_fichero, "r") as f:
+        contador = 0
+        for linea in f:
+            contador += 1
+            columnas = linea.split()
+                        
+            if len(columnas) > 80: # Comprobar que la línea tiene suficientes columnas
+                if esIP_UPNA(columnas[0]):
+                    # src es UPNA
+                    # Guardo las MACs
+                    if columnas[78] != "(null)":
+                        macsUPNA.add(columnas[78])
+                    if columnas[80] != "(null)":
+                        macsExternas.add(columnas[80])
+                elif esIP_UPNA(columnas[2]):
+                    # dst es UPNA
+                    if columnas[78] != "(null)":
+                        macsExternas.add(columnas[78])
+                    if columnas[80] != "(null)":
+                        macsUPNA.add(columnas[80])
+                else:
+                    logging.warning("Encontrado flujo sin IPs de la UPNA")
+            
+            # Limitamos el número de líneas en las que buscar direcciones MAC
+            if contador >= NumFlujosMirar:
+                break   
+    
+    numMacsUPNA = len(macsUPNA)
+    numMacsExternas = len(macsExternas)
+    mac1 = None
+    mac2 = None
+    if numMacsUPNA == 1:
+        mac1 = list(macsUPNA)[0]
+    else:
+        logging.info(f"Encontradas {numMacsUPNA} MACs posibles para el router UPNA")
+    if numMacsExternas == 1:
+        mac2 = list(macsExternas)[0]
+    else:
+        logging.info(f"Encontradas {numMacsExternas} MACs posibles para el router externo")
+
+    return (mac1, mac2)
+
+
+
 def obtener_IPs(directorioOutput):
     """
     Devuelve un set con las direcciones IP asociadas a la direccion MAC del router de la UPNA.
-
-    - Si la columna 78 es "00:41:d2:9b:d6:ef", añade el valor de la columna 1.
-    - Si la columna 80 es "00:41:d2:9b:d6:ef", añade el valor de la columna 3.
-
-    Las columnas se numeran desde 0.
     """
 
-    macUPNA = "00:41:d2:9b:d6:ef"
+    macs = obtener_MACs(directorioOutput)
+    logging.info("MACs: " + str(macs))
+    
+    macUPNA = macs[0]
     valores = set()
 
+
+    logging.info("Buscando IPs en fichero de flujos TCP")
     ruta_fichero = os.path.join(directorioOutput, ARCHIVO_TCP)
     with open(ruta_fichero, "r") as f:
+        contador = 0
         for linea in f:
+            contador += 1
+            if contador % 100000 == 0:
+                print(f"{contador}", file=sys.stderr, flush=True, end=" ")
             columnas = linea.split()
 
             # Comprobar que la línea tiene suficientes columnas
@@ -356,12 +482,17 @@ def obtener_IPs(directorioOutput):
 
                 if columnas[80] == macUPNA:
                     valores.add(columnas[2])
-        f.close()
 
+    
+    logging.info("\nBuscando IPs en fichero de flujos UDP")
     ruta_fichero = os.path.join(directorioOutput, ARCHIVO_UDP)
     with open(ruta_fichero, "r") as f:
+        contador = 0
         for linea in f:
             columnas = linea.split()
+            contador += 1
+            if contador % 100000 == 0:
+                print(f"{contador}", file=sys.stderr, flush=True, end=" ")
 
             # Comprobar que la línea tiene suficientes columnas
             if len(columnas) > 25:
@@ -371,10 +502,15 @@ def obtener_IPs(directorioOutput):
                 if columnas[25] == macUPNA:
                     valores.add(columnas[2])
 
+    logging.info("\nBuscando IPs en fichero de flujos ICMP")
     ruta_fichero = os.path.join(directorioOutput, ARCHIVO_ICMP)
     with open(ruta_fichero, "r") as f:
+        contador = 0
         for linea in f:
             columnas = linea.split()
+            contador += 1
+            if contador % 100000 == 0:
+                print(f"{contador}", file=sys.stderr, flush=True, end=" ")
 
             # Comprobar que la línea tiene suficientes columnas
             if len(columnas) > 23:
@@ -386,7 +522,8 @@ def obtener_IPs(directorioOutput):
 
     return valores
      
-def generarFiltrosNETs(ip: str) -> str:
+     
+def generarFiltrosNETsAllHosts(ip: str) -> str:
     """
     Rellena una plantilla de filtros NET con las dirección IP que se le ha proporcionado
     """
@@ -419,9 +556,17 @@ ether src {mac} and ip6
 ether src {mac} and ip6 and not (ip6 proto 58 or ip6 proto 6 or ip6 proto 17)"""
     return plantilla.format(mac=mac)
 
+def generarFiltrosBPFallHosts(ip: str) -> str:
+    """
+    Rellena una plantilla de filtros BPF con las direcciones IP
+    """
+    plantilla = """ip and src host {ip}
+ip and dst host {ip}"""
+    return plantilla.format(ip=ip)
+
 def crearArchivoFiltrosBPF(directorioOutput: str) -> str:
     """
-    Crea un archivo listando todos los filtros NETs que se le van a aplicar a tseries (herramienta)
+    Crea un archivo listando todos los filtros BPF que se le van a aplicar a tseries (herramienta)
     y los almacena en un archivo ARCHIVO_FILTROSBPF_TSERIES en el directorio de salida.
     El archivo permanece después de la ejecución como prueba.
     """
@@ -437,7 +582,24 @@ def crearArchivoFiltrosBPF(directorioOutput: str) -> str:
     logging.info(f"Filtros BPF escritos en: {ruta}")
     return ruta
 
-def crearArchivoFiltrosNETs(directorioOutput: str) -> str:
+def crearArchivoFiltrosBPFallHosts(directorioOutput: str) -> str:
+    """
+    Crea un archivo listando todos los filtros BPF que se le van a aplicar a tseries (herramienta)
+    y los almacena en un archivo ARCHIVO_FILTROSBPF_TSERIES en el directorio de salida.
+    El archivo permanece después de la ejecución como prueba.
+    """
+    ips = obtener_IPs(directorioOutput)
+    ruta = os.path.join(directorioOutput, ARCHIVO_FILTROSBPF_TSERIES)
+
+    with open(ruta, "w") as f:
+        for ip in sorted(ips, key=lambda p: sorted(p)):
+            f.write(generarFiltrosBPFallHosts(ip))
+            f.write("\n")
+
+    logging.info(f"Filtros BPF All Hosts escritos en: {ruta}")
+    return ruta
+
+def crearArchivoFiltrosNETsAllHosts(directorioOutput: str) -> str:
     """
     Crea un archivo listando todos los filtros NETs que se le van a aplicar a tseries (herramienta)
     y los almacena en un archivo ARCHIVO_FILTROSNETS_TSERIES en el directorio de salida.
@@ -448,10 +610,10 @@ def crearArchivoFiltrosNETs(directorioOutput: str) -> str:
 
     with open(ruta, "w") as f:
         for ip in sorted(ips, key=lambda p: sorted(p)):
-            f.write(generarFiltrosNETs(ip))
+            f.write(generarFiltrosNETsAllHosts(ip))
             f.write("\n")
 
-    logging.info(f"Filtros NETs escritos en: {ruta}")
+    logging.info(f"Filtros NETs All hosts escritos en: {ruta}")
     return ruta
 
 def crearFicheroListaGz(directorioInput: str, directorioOutput: str) -> str:
@@ -478,13 +640,14 @@ def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
     # 1- Preparamos archivos que tseries (herramienta) necesita
     logging.info("Construyendo los filtros...")
     #rutaFiltros = crearArchivoFiltrosBPF(directorioOutput)
-    rutaFiltros = crearArchivoFiltrosNETs(directorioOutput)
+    rutaFiltros = crearArchivoFiltrosBPFallHosts(directorioOutput)
+    #rutaFiltros = crearArchivoFiltrosNETsAllHosts(directorioOutput)
     logging.info("Filtros listos")
     rutaLista = crearFicheroListaGz(directorioInput, directorioOutput)
 
     # 2 - Ejecutamos tseries 
-    #tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros]
-    tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros, "-N"]
+    tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros]
+    #tseries_comand = [RUTA_BINARIO_TSERIES, "-v", "-m", "-i", rutaLista, "-f", rutaFiltros, "-N"]
     result = subprocess.run(tseries_comand, capture_output=True, text=True)
     logging.info("Ejecutando comando:")
     logging.info(" ".join(tseries_comand))
@@ -594,6 +757,7 @@ def lanzarProcesados(directorios: List[str], directorioSalidaPrimerNivel: str, d
         os.chmod(directorioOutput, 0o777)
 
         lanzarProcesaConexiones(directorioInput, directorioOutput)
+        lanzarProcesaConexionesSeries(directorioInput, directorioOutput) 
         lanzarTseries(directorioInput, directorioOutput)
 
     logging.info(f"{directorioOrigen} procesado satisfactoriamente")
@@ -616,17 +780,31 @@ def obtenerValoresDelConfig(rutaConfig: str) -> None:
     """
     Extrae los valores de las configuraciones del archivo proporcionado en --rutaConfig
     """
-    global RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES, RUTA_BINARIO_PROCESACONEXIONES, RUTA_BINARIO_TSERIES, RUTA_MODULOS_PROCESACONEXIONES, ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES
+    global RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES, RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES_SERIES, RUTA_BINARIO_PROCESACONEXIONES, RUTA_BINARIO_TSERIES, RUTA_MODULOS_PROCESACONEXIONES, ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES, REDESUPNA
 
     config = configparser.ConfigParser()
     config.read(rutaConfig)
 
     RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES = config['rutas']['rutaPlantillaConfiguracionesProcesaConexiones'] 
+    RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES_SERIES = config['rutas']['rutaPlantillaConfiguracionesProcesaConexionesSeries'] 
     RUTA_BINARIO_PROCESACONEXIONES = config['rutas']['rutaBinarioProcesaConexiones']
     RUTA_BINARIO_TSERIES = config['rutas']['rutaBinarioTseries']      
     RUTA_MODULOS_PROCESACONEXIONES = config['rutas']['rutaModulosProcesaConexiones']
 
     ARCHIVO_CONFIGURACIONES_PROCESACONEXIONES = os.path.basename(RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES)
+    
+    # Daniel
+    # Obtener las subredes de la UPNA
+    if 'redesUPNA' not in config:
+        print(f"Error: falta seccion [redesUPNA] en el fichero de configuracion")
+        return
+        
+    numRedes = int(config['redesUPNA']['numRedes'])
+    for idx in range(1, numRedes + 1):
+        linea = config['redesUPNA']['red' + str(idx)]
+        campos = linea.split('/')
+        network = ipaddress.IPv4Network( (campos[0], campos[1]), strict=False )
+        REDESUPNA.append(network)
 
 def prepararEntorno(args: argparse.Namespace) -> Tuple[str, str, List[str]]:
     """

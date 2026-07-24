@@ -1,0 +1,13 @@
+--inputFile {inputDirectory}
+--dirOfFiles 
+--outputFile {outputDirectory}
+--expert volcado:off
+--showProgress
+--showLogAll
+--pathModules {modulesDirectory} 
+--loadModule moduloSerieTemporal.so
+--externArgs tseries:output={outputFileModuloTseries}
+--externArgs tseries:intervalo=1000
+--externArgs tseries:todoEnUnFichero
+--logFile {pathLogFile} 
+
