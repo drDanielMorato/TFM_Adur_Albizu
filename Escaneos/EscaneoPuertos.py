@@ -49,6 +49,11 @@ COL_TCPBYTES_DS_TCP = 37  #bytesIPDstToSrc
 
 COL_FIRSTPACKETFLAGS_TCP = 48 # Flags del primer paquete que se ve (en hexadecimal), que si hay desorden puede no ser el primero de la conexion. 
 
+COL_SRC_IP_UDP = 0
+COL_DST_IP_UDP = 2
+COL_TCPBYTES_SD_UDP = 44
+COL_TCPBYTES_DS_UDP = 45
+
 LIMITE_PUERTOS= 10 #Limite por debajo del cual supongo más dudoso un escaneo de puertos
 
 #Rangos internos IP de la uni: 130.206.158.0 - 130.206.175.255
@@ -62,14 +67,14 @@ W_P=1
 W_H=1
 W_R=1
 
-#Umbral para decidir si una conversación es sospechosa 
-THRESHOLD = 0.52
+#OBSOLETO: Umbral para decidir si una conversación es sospechosa 
+THRESHOLD = 0
 
 # Para agilizar:
 _cache_ips = {}
 
 @dataclass
-class FlowData:
+class Conversacion:
 
     # Registros detallados de cada conexión individual, ordenados por t_inicio
     # Cada tupla: (t_inicio, t_fin, puerto_origen, puerto_destino)
@@ -80,6 +85,9 @@ class FlowData:
     h: float | None = None  # Entropia de Shannon normalizada
     d: float | None = None  # Desviación estándar del tiempo entre conexiones normalizada 1/(1+CV)
     puntuacion: float | None = None # Puntúa cómo de sospechosa es una interacción entre dos ips.   
+
+    # Sospechosa: Es una conversación sospechosa   
+    sospechosa: bool = True
 
     #Método de actualización
     def update(self, puerto_src, puerto_dst, t_inicio, t_fin) -> None:
@@ -114,26 +122,24 @@ def esIpInterna(src_ip: str) -> bool:
     _cache_ips[src_ip] = resultado
     return resultado
 
-def seDebeAniadirConversacion(dst_ip, total_tcp_data, 
+def seDebeAniadirRegistroFlujo(dst_ip, total_tcp_data_sd, total_tcp_data_ds,
                              number_syns_sd) -> bool:
 
-    # Esto se tenfrá que modificar para tcp connection scan,
-    # quizá comprobando solamente que no se envían datos del servidor 
-
-    conversacionSinDatos = total_tcp_data == 0
+    DatosSdEnRango = total_tcp_data_sd == 0
+    DatosDsEnRango = total_tcp_data_ds <= 256
     clienteEnviaSYN = number_syns_sd == 1
 
-    return (conversacionSinDatos and clienteEnviaSYN)
+    return (DatosSdEnRango and DatosDsEnRango) # and clienteEnviaSYN)
 
-def preprocesado() -> dict:
+def preprocesado() -> tuple[dict,int]:
     """
     Preparo la matriz necesaria para el procesado.
     Incluye todas las parejas de ips, con info como el timestamp de inicio de cada flujo perteneciente
     a la pareja, cuántos puertos se han atacado.
     """
     print(f"\nPreprocesando...")
-    conversaciones = defaultdict(FlowData)   
-    lineas_leidas = 0
+    conversaciones = defaultdict(Conversacion)   
+    contadorRegistrosFlujo = 0
 
     archivo = os.path.join(INPUT_PATH, "salida_tcp_")
 
@@ -180,9 +186,7 @@ def preprocesado() -> dict:
 
                     # Bytes transferidos
                     bytes_sd        = int(cols[COL_TCPBYTES_SD_TCP])
-                    # bytes_ds        = int(cols[COL_TCPBYTES_DS_TCP])
-                    total_tcp_data  = bytes_sd # + bytes_ds
-                    # Importante: solo he contado los bytes tcp de cliente a destino 
+                    bytes_ds        = int(cols[COL_TCPBYTES_DS_TCP])
 
                     # Flags del primer paquete (hex)
                     # first_packet_flags = cols[COL_FIRSTPACKETFLAGS_TCP].decode()
@@ -191,20 +195,76 @@ def preprocesado() -> dict:
                     print(f"  ERROR: {e} | línea: {fila[:80]}")
                     continue
 
-
-                if (seDebeAniadirConversacion(dst_ip, total_tcp_data, 
+                clave = (src_ip,dst_ip)
+                if (seDebeAniadirRegistroFlujo(dst_ip, bytes_sd, bytes_ds,
                                                 number_syns_sd)):
-                    clave = (src_ip,dst_ip)
+                    
                     conversaciones[clave].update(src_port, dst_port, first_packet_time , last_packet_time)
+                else:
+                    conversaciones[clave].sospechosa = False
 
-                lineas_leidas  += 1
-                if lineas_leidas % 5_000_000 == 0:
-                    print(f"  procesadas {lineas_leidas:,} líneas...")
-            print(f"  procesadas al completo {lineas_leidas:,} líneas...")
+                contadorRegistrosFlujo  += 1
+                if contadorRegistrosFlujo % 5_000_000 == 0:
+                    print(f"Procesadas {contadorRegistrosFlujo:,} líneas...")
+
+    return conversaciones, contadorRegistrosFlujo
+
+def descartarFalsosPositivo(conversaciones) -> dict:
+    """
+    Busca conversaciones UDP ocurriendo simultaneamente a las conversaciones TCP eistentes para descartar falsos positivos
+    """
+
+    archivo = os.path.join(INPUT_PATH, "salida_udp_")
+
+    with open(archivo, "rb") as f:
+        #Mientras que el texto sea ascii puro, no hay problema de lectura. Cuidado si fuera unicode
+        with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
+            while True:
+                fila = mm.readline()
+                if not fila:        # fin del archivo
+                    break
+                try:
+                    
+                    cols = fila.split()
+
+                    src_ip   = cols[COL_SRC_IP_UDP].decode()
+                    dst_ip   = cols[COL_DST_IP_UDP].decode()
+                    
+                    bytes_sd = int(cols[COL_TCPBYTES_SD_UDP])
+                    bytes_ds = int(cols[COL_TCPBYTES_DS_UDP])
+
+                except (IndexError, ValueError) as e:
+                    print(f"  ERROR: {e} | línea: {fila[:80]}")
+                    continue
+
+                clave = (src_ip,dst_ip)
+                claveInversa = (clave[1], clave[0])
+                if clave in conversaciones:
+                    conversaciones[clave].sospechosa = False
+                if claveInversa in conversaciones:
+                    conversaciones[claveInversa].sospechosa = False
 
     return conversaciones
 
-def calcular_p_h(conv: FlowData) -> None:
+def imprimirEstadisticas(conversaciones: dict, contadorRegistrosFlujo: int) -> None:
+    """Imprime estadísticas de conversaciones/registros sospechosos, excluyendo las
+    conversaciones de un solo puerto (no puerto único, sino 1 solo puerto)."""
+
+    contadorRegistrosFlujoSospechosos = sum(
+        len(conv.conexiones) for conv in conversaciones.values()
+        if conv.sospechosa and len({c[3] for c in conv.conexiones}) > 1
+    )
+    contadorConversaciones = len(conversaciones)
+    contadorConversacionesSospechosas = sum(
+        1 for conv in conversaciones.values()
+        if conv.sospechosa and len({c[3] for c in conv.conexiones}) > 1
+    )
+
+    print(f"De {contadorRegistrosFlujo} registros de flujo, {contadorRegistrosFlujoSospechosos} fueron registrados flujos sospechosos. Porcentaje:{contadorRegistrosFlujoSospechosos/contadorRegistrosFlujo*100:.2f}%")
+    print(f"De {contadorConversaciones} conversaciones, {contadorConversacionesSospechosas} son sospechosas. Porcentaje {contadorConversacionesSospechosas/contadorConversaciones*100:.2f}%")
+
+
+def calcular_p_h(conv: Conversacion) -> None:
     """
     p: 
     Divide el # de puertos unicos entre el umbral mínimo a partir del cual
@@ -231,7 +291,7 @@ def calcular_p_h(conv: FlowData) -> None:
 
     conv.p = min(n_uniq / LIMITE_PUERTOS, 1.0)
 
-def calcular_d(conv: FlowData) -> None:
+def calcular_d(conv: Conversacion) -> None:
     """
     Periodicidad del escaneo: 1 / (1 + CV), donde CV = std / mean
     de los tiempos entre conexiones consecutivas. Así resultado entre 0 y 1
@@ -257,7 +317,7 @@ def calcular_d(conv: FlowData) -> None:
     std = math.sqrt(sum((x - media)**2 for x in intervalos) / len(intervalos))
     conv.d = 1 / (1 + std/media)
 
-def puntuar(conv: FlowData) -> None:
+def puntuar(conv: Conversacion) -> None:
     """
     Pongo una puntuación de sospecha [0, 1]. Tengo que calibrar w_p, w_H, w_r con nmap.
     p alto, muchos puertos únicos, sospechoso
@@ -274,7 +334,7 @@ def puntuar(conv: FlowData) -> None:
 def imprimir_resultado(conversaciones: dict) -> None:
     """Imprime las conversaciones sospechosas ordenadas por puntuación en la terminal."""
 
-    archivoOutput = os.path.join(OUTPUT_PATH,"salida.txt")
+    archivoOutput = os.path.join(OUTPUT_PATH,"salida2.txt")
     # Ordena por puntuación descendente
     ordenadas = sorted(
         conversaciones.items(),
@@ -283,32 +343,32 @@ def imprimir_resultado(conversaciones: dict) -> None:
     )
 
     with open(archivoOutput, "w", encoding="utf-8", buffering=1024 * 1024) as f:
-
-        f.write(f"\n{'First (unix)':<16} {'First (human)':<22} {'Last (unix)':<16} {'Last (human)':<22} {'SRC_IP':<20} {'DST_IP':<20} {'PUERTOS':>8} {'p':^6} {'h':^6} {'d':^6} {'SCORE':>7}\n")
-        f.write("-" * 130)
+        f.write(f"\n{'Start (unix)':<16} {'Ending (unix)':<16} {'Start (local)':<20} {'Ending (local)':<20} {'IpSrc':<15} {'IpDst':<15} {'p':^7} {'h':^7} {'d':^7} {'No. Ports':<10} {'No. Unique':<12} {'Target Ports'}\n")
+        f.write("-" * 210)
         f.write("\n")
 
         for (src_ip, dst_ip), conv in ordenadas:
-            # if conv.puntuacion is None:
-            #     continue
-            # if conv.puntuacion > THRESHOLD:
-            #
+            if conv.puntuacion is None:
+                continue
+            if conv.sospechosa and len({c[3] for c in conv.conexiones}) >1:
+                t_first = conv.conexiones[0][0]
+                t_last  = conv.conexiones[-1][1]
 
-            t_first = conv.conexiones[0][0]
-            t_last  = conv.conexiones[-1][1]
+                t_first_human = datetime.datetime.fromtimestamp(t_first).strftime("%Y-%m-%d %H:%M:%S")
+                t_last_human  = datetime.datetime.fromtimestamp(t_last).strftime("%Y-%m-%d %H:%M:%S")
 
-            t_first_human = datetime.datetime.fromtimestamp(t_first).strftime("%Y-%m-%d %H:%M:%S")
-            t_last_human  = datetime.datetime.fromtimestamp(t_last).strftime("%Y-%m-%d %H:%M:%S")
-
-            f.write((
-                f"{t_first:<16.2f}{t_first_human:<22}{t_last:<16.2f}{t_last_human:<22}{src_ip:<20} {dst_ip:<20}"
-                f"{len({c[3] for c in conv.conexiones}):>8}"
-                f"{conv.p or 0:>7.2f}"
-                f"{conv.h or 0:>7.2f}"
-                f"{conv.d or 0:>7.2f}"
-                f"{conv.puntuacion or 0:>7.2f}"
-                f"\n"
-            ))
+                puertoDestino = ",".join(f"{c[3]}" for c in conv.conexiones)
+                 
+                f.write((
+                    f"{t_first:<16.2f} {t_last:<16.2f} {t_first_human:<20} {t_last_human:<20} {src_ip:<15} {dst_ip:<15}"
+                    f" {conv.p or 0:^7.2f}"
+                    f" {conv.h or 0:^7.2f}"
+                    f" {conv.d or 0:^7.2f}"
+                    f" {len([c[3] for c in conv.conexiones]):^10}"
+                    f" {len({c[3] for c in conv.conexiones}):^12}"
+                    f" {puertoDestino}"
+                    f"\n"
+                ))
 
 def manejarArgumentos(args) -> None:
     global INPUT_PATH, OUTPUT_PATH
@@ -323,8 +383,10 @@ def main():
         args = parseArgs()
         manejarArgumentos(args)
 
-        conversaciones =  preprocesado()
-        print(f"{len(conversaciones)} conversaciones registradas para su análisis...")
+        conversaciones, contadorRegistrosFlujo =  preprocesado()
+        conversaciones = descartarFalsosPositivo(conversaciones)
+        imprimirEstadisticas(conversaciones, contadorRegistrosFlujo)
+
         # Calculamos los valores para p, h y r para cada conversacion
         for conv in conversaciones.values():
             calcular_p_h(conv)
