@@ -51,10 +51,13 @@ COL_FIRSTPACKETFLAGS_TCP = 48 # Flags del primer paquete que se ve (en hexadecim
 
 COL_SRC_IP_UDP = 0
 COL_DST_IP_UDP = 2
-COL_TCPBYTES_SD_UDP = 44
-COL_TCPBYTES_DS_UDP = 45
+COL_UDPBYTES_SD_UDP = 44
+COL_UDPBYTES_DS_UDP = 45
 
 LIMITE_PUERTOS= 10 #Limite por debajo del cual supongo más dudoso un escaneo de puertos
+
+# Ventana temporal 
+INTERVALO_ESCANEOS_DIFERENTES = 86400 #Intervalo a partir del cual separo dos escaneos a una misma IP. 24h
 
 #Rangos internos IP de la uni: 130.206.158.0 - 130.206.175.255
 RANGOS_INTERNOS =["130.206.158.0/23", #130.206.158.0 - 130.206.159.255 
@@ -76,9 +79,16 @@ _cache_ips = {}
 @dataclass
 class Conversacion:
 
+    # Pareja de Ips de la conversación 
+    srcIp: str
+    dstIp: str
+
     # Registros detallados de cada conexión individual, ordenados por t_inicio
     # Cada tupla: (t_inicio, t_fin, puerto_origen, puerto_destino)
     conexiones: list[tuple[float, float, str, str]] = field(default_factory=list)
+
+    #Tiempo final de la última conexión de la conversación
+    ultimaActividad: float = 0.0
 
     #Computaciones finales
     p: float | None = None  # Numero de puertos únicos normalizados
@@ -122,6 +132,25 @@ def esIpInterna(src_ip: str) -> bool:
     _cache_ips[src_ip] = resultado
     return resultado
 
+def ObtenerOCrearConversacion(conversaciones, ultimaConversacionPorPareja, srcIp, dstIp, tInicio) -> Conversacion:
+    """
+    Dadas las IP origen e IP destino de una conexión, este método comprueba que ultimaConversacionPorPareja contiene una conversación identificada
+    por dicha pareja de direcciones IP y si han pasado INTERVALO_ESCANEOS_DIFERENTES segundos desde el t_inicio de la conexión y el t_final de la conexión más
+    nueva de la conversación correspondiente.
+    Si es así, se devuelve la conexión existente. Si no es el caso, se crea una nueva conexión identificada por la pareja de ips.
+    """
+    clave = (srcIp, dstIp)
+    conv = ultimaConversacionPorPareja.get(clave)
+
+    if conv and (abs(tInicio - conv.ultimaActividad)) <= INTERVALO_ESCANEOS_DIFERENTES:
+        conv.ultimaActividad = tInicio
+        return conv
+
+    nueva = Conversacion(srcIp=srcIp, dstIp=dstIp, ultimaActividad=tInicio)
+    conversaciones.append(nueva)
+    ultimaConversacionPorPareja[clave] = nueva
+    return nueva
+
 def seDebeAniadirRegistroFlujo(dst_ip, total_tcp_data_sd, total_tcp_data_ds,
                              number_syns_sd) -> bool:
 
@@ -131,14 +160,17 @@ def seDebeAniadirRegistroFlujo(dst_ip, total_tcp_data_sd, total_tcp_data_ds,
 
     return (DatosSdEnRango and DatosDsEnRango) # and clienteEnviaSYN)
 
-def preprocesado() -> tuple[dict,int]:
+def preprocesado() -> tuple[list, int]:
     """
     Preparo la matriz necesaria para el procesado.
     Incluye todas las parejas de ips, con info como el timestamp de inicio de cada flujo perteneciente
     a la pareja, cuántos puertos se han atacado.
     """
     print(f"\nPreprocesando...")
-    conversaciones = defaultdict(Conversacion)   
+
+    conversaciones: list[Conversacion] = []
+    ultimaConversacionPorPareja: dict[tuple[str, str], Conversacion] = {}
+
     contadorRegistrosFlujo = 0
 
     archivo = os.path.join(INPUT_PATH, "salida_tcp_")
@@ -154,10 +186,10 @@ def preprocesado() -> tuple[dict,int]:
                     
                     cols = fila.split()
 
-                    src_ip   = cols[COL_SRC_IP_TCP].decode()
-                    dst_ip   = cols[COL_DST_IP_TCP].decode()
-                    src_port = cols[COL_SRC_PORT_TCP].decode()
-                    dst_port = cols[COL_DST_PORT_TCP].decode()
+                    srcIp   = cols[COL_SRC_IP_TCP].decode()
+                    dstIp   = cols[COL_DST_IP_TCP].decode()
+                    srcPort = cols[COL_SRC_PORT_TCP].decode()
+                    dstPort = cols[COL_DST_PORT_TCP].decode()
 
                     # Tiempos
                     first_packet_time  = float(cols[COL_FIRSTPACKETTIME_TCP])
@@ -192,16 +224,16 @@ def preprocesado() -> tuple[dict,int]:
                     # first_packet_flags = cols[COL_FIRSTPACKETFLAGS_TCP].decode()
 
                 except (IndexError, ValueError) as e:
-                    print(f"  ERROR: {e} | línea: {fila[:80]}")
-                    continue
+                    raise RuntimeError(f"  ERROR: {e} | línea: {fila[:80]}")
 
-                clave = (src_ip,dst_ip)
-                if (seDebeAniadirRegistroFlujo(dst_ip, bytes_sd, bytes_ds,
+                conversacion = ObtenerOCrearConversacion(conversaciones, ultimaConversacionPorPareja, srcIp, dstIp, first_packet_time)
+
+                if (seDebeAniadirRegistroFlujo(dstIp, bytes_sd, bytes_ds,
                                                 number_syns_sd)):
                     
-                    conversaciones[clave].update(src_port, dst_port, first_packet_time , last_packet_time)
+                    conversacion.update(srcPort, dstPort, first_packet_time , last_packet_time)
                 else:
-                    conversaciones[clave].sospechosa = False
+                    conversacion.sospechosa = False
 
                 contadorRegistrosFlujo  += 1
                 if contadorRegistrosFlujo % 5_000_000 == 0:
@@ -209,12 +241,17 @@ def preprocesado() -> tuple[dict,int]:
 
     return conversaciones, contadorRegistrosFlujo
 
-def descartarFalsosPositivo(conversaciones) -> dict:
+def descartarFalsosPositivos(conversaciones: list[Conversacion]) -> None:
     """
     Busca conversaciones UDP ocurriendo simultaneamente a las conversaciones TCP eistentes para descartar falsos positivos
     """
 
     archivo = os.path.join(INPUT_PATH, "salida_udp_")
+
+    indice = defaultdict(list)
+    for conv in conversaciones:
+        indice[(conv.srcIp, conv.dstIp)].append(conv)
+    #Construyo un diccionario que me evite tener que recorrer conversaciones cada vez que quiera comprobar si una clave está dentro, en el bucle de lectura    
 
     with open(archivo, "rb") as f:
         #Mientras que el texto sea ascii puro, no hay problema de lectura. Cuidado si fuera unicode
@@ -224,45 +261,40 @@ def descartarFalsosPositivo(conversaciones) -> dict:
                 if not fila:        # fin del archivo
                     break
                 try:
-                    
                     cols = fila.split()
 
-                    src_ip   = cols[COL_SRC_IP_UDP].decode()
-                    dst_ip   = cols[COL_DST_IP_UDP].decode()
+                    srcIp   = cols[COL_SRC_IP_UDP].decode()
+                    dstIp   = cols[COL_DST_IP_UDP].decode()
                     
-                    bytes_sd = int(cols[COL_TCPBYTES_SD_UDP])
-                    bytes_ds = int(cols[COL_TCPBYTES_DS_UDP])
+                    bytes_sd = int(cols[COL_UDPBYTES_SD_UDP])
+                    bytes_ds = int(cols[COL_UDPBYTES_DS_UDP])
 
                 except (IndexError, ValueError) as e:
-                    print(f"  ERROR: {e} | línea: {fila[:80]}")
-                    continue
+                    raise RuntimeError(f"  ERROR: {e} | línea: {fila[:80]}")
 
-                clave = (src_ip,dst_ip)
-                claveInversa = (clave[1], clave[0])
-                if clave in conversaciones:
-                    conversaciones[clave].sospechosa = False
-                if claveInversa in conversaciones:
-                    conversaciones[claveInversa].sospechosa = False
+                clave = (srcIp, dstIp)
+                claveInversa = (dstIp, srcIp)
+                for conv in indice.get(clave, []):
+                    conv.sospechosa = False
+                for conv in indice.get(claveInversa, []):
+                    conv.sospechosa = False
 
-    return conversaciones
-
-def imprimirEstadisticas(conversaciones: dict, contadorRegistrosFlujo: int) -> None:
+def imprimirEstadisticas(conversaciones: list[Conversacion], contadorRegistrosFlujo: int) -> None:
     """Imprime estadísticas de conversaciones/registros sospechosos, excluyendo las
     conversaciones de un solo puerto (no puerto único, sino 1 solo puerto)."""
 
     contadorRegistrosFlujoSospechosos = sum(
-        len(conv.conexiones) for conv in conversaciones.values()
+        len(conv.conexiones) for conv in conversaciones
         if conv.sospechosa and len({c[3] for c in conv.conexiones}) > 1
     )
     contadorConversaciones = len(conversaciones)
     contadorConversacionesSospechosas = sum(
-        1 for conv in conversaciones.values()
+        1 for conv in conversaciones
         if conv.sospechosa and len({c[3] for c in conv.conexiones}) > 1
     )
 
     print(f"De {contadorRegistrosFlujo} registros de flujo, {contadorRegistrosFlujoSospechosos} fueron registrados flujos sospechosos. Porcentaje:{contadorRegistrosFlujoSospechosos/contadorRegistrosFlujo*100:.2f}%")
     print(f"De {contadorConversaciones} conversaciones, {contadorConversacionesSospechosas} son sospechosas. Porcentaje {contadorConversacionesSospechosas/contadorConversaciones*100:.2f}%")
-
 
 def calcular_p_h(conv: Conversacion) -> None:
     """
@@ -331,14 +363,14 @@ def puntuar(conv: Conversacion) -> None:
     total = W_P + W_H + W_R
     conv.puntuacion = (W_P * conv.p + W_H * conv.h + W_R * conv.d) / total
 
-def imprimir_resultado(conversaciones: dict) -> None:
+def imprimir_resultado(conversaciones: list[Conversacion]) -> None:
     """Imprime las conversaciones sospechosas ordenadas por puntuación en la terminal."""
 
     archivoOutput = os.path.join(OUTPUT_PATH,"salida2.txt")
     # Ordena por puntuación descendente
     ordenadas = sorted(
-        conversaciones.items(),
-        key=lambda item: item[1].puntuacion if item[1].puntuacion is not None else -1,
+        conversaciones, 
+        key=lambda conv: conv.puntuacion if conv.puntuacion is not None else -1,
         reverse=True
     )
 
@@ -347,12 +379,12 @@ def imprimir_resultado(conversaciones: dict) -> None:
         f.write("-" * 210)
         f.write("\n")
 
-        for (src_ip, dst_ip), conv in ordenadas:
+        for conv in ordenadas:
             if conv.puntuacion is None:
                 continue
             if conv.sospechosa and len({c[3] for c in conv.conexiones}) >1:
                 t_first = conv.conexiones[0][0]
-                t_last  = conv.conexiones[-1][1]
+                t_last  = max(c[1] for c in conv.conexiones)
 
                 t_first_human = datetime.datetime.fromtimestamp(t_first).strftime("%Y-%m-%d %H:%M:%S")
                 t_last_human  = datetime.datetime.fromtimestamp(t_last).strftime("%Y-%m-%d %H:%M:%S")
@@ -360,11 +392,11 @@ def imprimir_resultado(conversaciones: dict) -> None:
                 puertoDestino = ",".join(f"{c[3]}" for c in conv.conexiones)
                  
                 f.write((
-                    f"{t_first:<16.2f} {t_last:<16.2f} {t_first_human:<20} {t_last_human:<20} {src_ip:<15} {dst_ip:<15}"
+                    f"{t_first:<16.2f} {t_last:<16.2f} {t_first_human:<20} {t_last_human:<20} {conv.srcIp:<15} {conv.dstIp:<15}"
                     f" {conv.p or 0:^7.2f}"
                     f" {conv.h or 0:^7.2f}"
                     f" {conv.d or 0:^7.2f}"
-                    f" {len([c[3] for c in conv.conexiones]):^10}"
+                    f" {len(conv.conexiones):^10}"
                     f" {len({c[3] for c in conv.conexiones}):^12}"
                     f" {puertoDestino}"
                     f"\n"
@@ -384,11 +416,11 @@ def main():
         manejarArgumentos(args)
 
         conversaciones, contadorRegistrosFlujo =  preprocesado()
-        conversaciones = descartarFalsosPositivo(conversaciones)
+        descartarFalsosPositivos(conversaciones)
         imprimirEstadisticas(conversaciones, contadorRegistrosFlujo)
 
         # Calculamos los valores para p, h y r para cada conversacion
-        for conv in conversaciones.values():
+        for conv in conversaciones:
             calcular_p_h(conv)
             calcular_d(conv)
             puntuar(conv)
