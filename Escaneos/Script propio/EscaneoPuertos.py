@@ -1,6 +1,5 @@
 # Script inicial para encontrar escaneos TCP SYN Scan.
 
-
 from __future__ import annotations # don't execute type hints, just store them as text strings
 import time
 import datetime
