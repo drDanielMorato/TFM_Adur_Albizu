@@ -1,10 +1,8 @@
 from dataclasses import dataclass
 
 @dataclass
-class Flujo:
-    """ Tupla representando a un flujo en específico"""
-    tStart : float
+class DatosPaquete:
+    tStart: float
     srcIp: str
     dstIp: str
     dstPort: int
-

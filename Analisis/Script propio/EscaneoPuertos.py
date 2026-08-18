@@ -291,7 +291,7 @@ def imprimirEstadisticas(conversaciones: list[Conversacion], contadorRegistrosFl
         1 for conv in conversaciones
         if conv.sospechosa and len({c[3] for c in conv.conexiones}) > 1
     )
-
+    
     print(f"De {contadorRegistrosFlujo} registros de flujo, {contadorRegistrosFlujoSospechosos} fueron registrados flujos sospechosos. Porcentaje:{contadorRegistrosFlujoSospechosos/contadorRegistrosFlujo*100:.2f}%")
     print(f"De {contadorConversaciones} conversaciones, {contadorConversacionesSospechosas} son sospechosas. Porcentaje {contadorConversacionesSospechosas/contadorConversaciones*100:.2f}%")
 

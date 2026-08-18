@@ -2,9 +2,8 @@ from __future__ import annotations
 from config import *
 from .flujo import Flujo
 from .candidato import Candidato
-import os 
 import mmap
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 def procesar(ruta_archivo_flujos : str) -> list[Candidato]:
     """

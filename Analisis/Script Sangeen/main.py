@@ -1,5 +1,5 @@
 """
-Script que implementa el método de Neu et al. 
+Script que implementa el método de Sangeen et al.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ def main() -> None:
         ruta_archivo_resultado = args.rutaDestino
 
         sospechosos = procesar(ruta_archivo_flujos)
-        imprimir_resultado(sospechosos, ruta_archivo_resultado)
+        # im  primir_resultado(sospechosos, ruta_archivo_resultado)
 
     except Exception as e:
         print(f"Fallo inesperado en el script: {e}")
