@@ -10,16 +10,17 @@ import datetime
 import sys
 import traceback
 
+
 def main() -> None:
     try:
         inicio = time.time()
 
         args = parseArgs()
-        ruta_archivo_flujos = args.rutaOrigen
-        ruta_archivo_resultado = args.rutaDestino
+        ruta_gzs = args.rutaOrigen
+        ruta_archivo_resultado = args.archivoDestino
 
-        sospechosos = procesar(ruta_archivo_flujos)
-        # im  primir_resultado(sospechosos, ruta_archivo_resultado)
+        sospechosos = procesar(ruta_gzs)
+        imprimir_resultado(sospechosos, ruta_archivo_resultado)
 
     except Exception as e:
         print(f"Fallo inesperado en el script: {e}")

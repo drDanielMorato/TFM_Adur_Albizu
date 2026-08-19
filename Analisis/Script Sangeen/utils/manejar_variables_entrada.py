@@ -11,10 +11,10 @@ def parseArgs() -> argparse.Namespace:
         help="Directorio donde se encuentran los pcaps a analizar"
     )
     parser.add_argument(
-        "--rutaDestino",
+        "--archivoDestino",
         "-d",
         required=True,
-        help="Directorio donde dejaremos los resultados del análisis"
+        help="Archivo en el que dejaremos los resultados del análisis"
     )
 
     return parser.parse_args()

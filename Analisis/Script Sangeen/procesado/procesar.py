@@ -1,36 +1,80 @@
 from __future__ import annotations
-from config import *
-from .DatosPaquete import DatosPaquete
+from config import TIME_THRESHOLD, UNIQUE_PORTS_THRESHOLD
 from .candidato import Candidato
+from .CamposFlowEntry import CamposFlowEntry
+from .DatosPaquete import DatosPaquete
 
+def _crear_flow_entry(paquete: DatosPaquete) -> CamposFlowEntry:
+    return CamposFlowEntry(
+        dstPorts={paquete.dstPort},
+        ruta_pcap=paquete.ruta_pcap,
+        tiempo_inicio=paquete.tStart,
+        tiempo_final=paquete.tStart,
+    )
 
-def procesar(ruta_archivos_paquetes: str) -> None:
-    """
-    Consume leer_paquetes en streaming, agrupando los flujos en ventanas de 1 segundo,
-    para no acumular en memoria todos los flujos de los 24 pcaps a la vez.
-    """
-    from utils import leer_paquetes  # import diferido: evita el ciclo utils <-> procesado
+def _anadir_paquete(flow_entry: CamposFlowEntry, paquete: DatosPaquete) -> None:
+    flow_entry.dstPorts.add(paquete.dstPort)
+    flow_entry.tiempo_final = paquete.tStart
+
+def _crear_candidato(flow_entry: CamposFlowEntry, paquete: DatosPaquete) -> Candidato:
+    return Candidato(
+        tInicio=flow_entry.tiempo_inicio,
+        srcIp=paquete.srcIp,
+        dstIp=paquete.dstIp,
+        dstPorts=list(flow_entry.dstPorts),
+        fileName=flow_entry.ruta_pcap,
+    )
+
+def _eliminar_flow_entries_expiradas(
+    tiempo_actual: float,
+    flow_entries: dict[tuple[str, str], CamposFlowEntry],
+) -> None:
+    limite = tiempo_actual - TIME_THRESHOLD
+    claves_expiradas = [
+        clave
+        for clave, flow_entry in flow_entries.items()
+        if flow_entry.tiempo_final < limite
+    ]
+    for clave in claves_expiradas:
+        del flow_entries[clave]
+
+def procesar(ruta_archivos_paquetes: str) -> list[Candidato]:
+    """Procesa paquetes y devuelve las flow entries que parecen escaneos."""
+    from typing import Iterator
+    from utils import leer_paquetes  
 
     candidatos: list[Candidato] = []
-    flujos: list[DatosPaquete] = []
-    tiempoInicioVentana: float | None = None
+    flow_entries: dict[tuple[str, str], CamposFlowEntry] = {}
+    proxima_limpieza = float("-inf")
+    paquetes: Iterator[DatosPaquete] = leer_paquetes(ruta_archivos_paquetes)
 
-    for paquete in leer_paquetes(ruta_archivos_paquetes):
-        if tiempoInicioVentana is None:
-            tiempoInicioVentana = paquete.tStart
+    # Iteramos sobre los paquetes ordenados por timestamp
+    for paquete in paquetes:
+        clave = (paquete.srcIp, paquete.dstIp)
+        if paquete.tStart >= proxima_limpieza:
+            _eliminar_flow_entries_expiradas(paquete.tStart, flow_entries)
+            proxima_limpieza = paquete.tStart + 1.0
+            #eliminamos entradas para liberar memoria
 
-        if paquete.tStart > tiempoInicioVentana + 1.0:
-            # candidatos.extend(analizar_ventana(flujos))
-            tiempoInicioVentana = paquete.tStart
-            flujos = []
+        flow_entry = flow_entries.get(clave)
+        if (
+            flow_entry is not None
+            and paquete.tStart - flow_entry.tiempo_final > TIME_THRESHOLD
+        ):
+            flow_entry = None # si el paquete llega demasiado tarde, se considera que la flow entry ha expirado y se crea una nueva para este paquete
 
-        flujos.append(paquete)
+        if flow_entry is None:
+            flow_entry = _crear_flow_entry(paquete)
+            flow_entries[clave] = flow_entry
+            continue # aquí creamos la flow entry si es necesario, y pasamos al siguiente paquete
 
-    # if flujos:
-    #     candidatos.extend(analizar_ventana(flujos))
-    # return
+        _anadir_paquete(flow_entry, paquete) #ahora que tenemos la flow entry, añadimos el paquete a ella
 
+        if (
+            not flow_entry.detectada
+            and len(flow_entry.dstPorts) > UNIQUE_PORTS_THRESHOLD
+        ):
+            candidatos.append(_crear_candidato(flow_entry, paquete))
+            flow_entry.detectada = True
 
-def analizar_ventana(flujos: list[DatosPaquete]) -> list[Candidato]:
-    """Analiza los flujos de una ventana de 1 segundo para encontrar posibles escaneos (método de Sangeen et al.)."""
-    raise NotImplementedError
+    return candidatos

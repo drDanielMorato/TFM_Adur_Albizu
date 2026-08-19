@@ -6,3 +6,4 @@ class DatosPaquete:
     srcIp: str
     dstIp: str
     dstPort: int
+    ruta_pcap: str
