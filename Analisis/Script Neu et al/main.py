@@ -3,7 +3,7 @@ Script que implementa el método de Neu et al.
 """
 
 from __future__ import annotations
-from utils import parseArgs, imprimir_resultado
+from utils import parseArgs, imprimir_resultado, localizar_archivo_tcp
 from procesado import procesar
 import time
 import datetime
@@ -15,10 +15,11 @@ def main() -> None:
         inicio = time.time()
 
         args = parseArgs()
-        ruta_archivo_flujos = args.rutaOrigen
+        ruta_directorio_flujos = args.rutaOrigen
         ruta_archivo_resultado = args.rutaDestino
 
-        sospechosos = procesar(ruta_archivo_flujos)
+        archivo_tcp = localizar_archivo_tcp(ruta_directorio_flujos)
+        sospechosos = procesar(archivo_tcp)
         imprimir_resultado(sospechosos, ruta_archivo_resultado)
 
     except Exception as e:
