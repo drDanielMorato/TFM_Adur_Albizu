@@ -21,8 +21,7 @@ def leer_paquetes(directorio: str) -> Iterator[DatosPaquete]:
     """
     FUnción que lee los paquetes de los archivos .gz en el directorio dado y devuelve un iterador de DatosPaquete ordenados por timestamp.
     """
-    yield from _reordenar_paquetes(_leer_paquetes_sin_ordenar(directorio))
-
+    yield from _leer_paquetes_sin_ordenar(directorio) #_reordenar_paquetes(_leer_paquetes_sin_ordenar(directorio))
 
 def _leer_paquetes_sin_ordenar(directorio: str) -> Iterator[DatosPaquete]:
     """Leemos los paquetes de los .gz del directorio de entrada
