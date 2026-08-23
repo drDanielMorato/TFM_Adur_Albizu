@@ -53,10 +53,9 @@ def analizar_ventana(flujos : list[Flujo]) -> list[Candidato] :
     """
     nuevos_candidatos : list[Candidato] = []
 
-    nuevos_candidatos.extend(detectar_escaneos_horizontales(flujos))
+    # nuevos_candidatos.extend(detectar_escaneos_horizontales(flujos))
     nuevos_candidatos.extend(detectar_escaneos_verticales(flujos))
-    nuevos_candidatos.extend(detectar_escaneos_mixtos(flujos))
-
+    # nuevos_candidatos.extend(detectar_escaneos_mixtos(flujos))
 
     return nuevos_candidatos
 
