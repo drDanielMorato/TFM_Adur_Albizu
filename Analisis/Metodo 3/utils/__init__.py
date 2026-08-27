@@ -1,4 +1,4 @@
 from .manejar_variables_entrada import parseArgs
 from .imprimir import imprimir_resultado, imprimir_resultado_json, imprimirEstadisticas
-from .leer_archivos import localizar_archivos_flujos, leer_registros_flujo_ordenados
+from .leer_archivos import localizar_archivos_flujos, localizar_archivos_flujos_opcionales, leer_registros_flujo_ordenados, obtener_lista_archivos_pcap
 from .redes import esIpInterna

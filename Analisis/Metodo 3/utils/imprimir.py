@@ -31,7 +31,7 @@ def imprimir_resultado(conversaciones: list[Conversacion], ruta_archivo_resultad
     archivoOutput = os.path.join(ruta_archivo_resultado, ARCHIVO_RESULTADO)
 
     with open(archivoOutput, "w", encoding="utf-8", buffering=1024 * 1024) as f:
-        f.write(f"\n{'Start (unix)':<16} {'Ending (unix)':<16} {'Start (local)':<20} {'Ending (local)':<20} {'Proto':<5} {'IpSrc':<15} {'IpDst':<15} {'h':^7} {'No. Ports':<10} {'No. Unique':<12} {'Target Ports'}\n")
+        f.write(f"\n{'Start (unix)':<16} {'Ending (unix)':<16} {'Start (UTC)':<20} {'Ending (UTC)':<20} {'Proto':<5} {'IpSrc':<15} {'IpDst':<15} {'h':^7} {'No. Ports':<10} {'No. Unique':<12} {'Target Ports'}\n")
         f.write("-" * 210)
         f.write("\n")
 
@@ -40,8 +40,8 @@ def imprimir_resultado(conversaciones: list[Conversacion], ruta_archivo_resultad
                 t_first = conv.conexiones[0][0]
                 t_last  = max(c[1] for c in conv.conexiones)
 
-                t_first_human = datetime.datetime.fromtimestamp(t_first, ZONA_HORARIA_ESPANA).strftime("%Y-%m-%d %H:%M:%S")
-                t_last_human  = datetime.datetime.fromtimestamp(t_last, ZONA_HORARIA_ESPANA).strftime("%Y-%m-%d %H:%M:%S")
+                t_first_human = datetime.datetime.fromtimestamp(t_first, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                t_last_human = datetime.datetime.fromtimestamp(t_last, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
                 puertoDestino = ",".join(f"{c[3]}" for c in conv.conexiones)
                  
@@ -54,13 +54,13 @@ def imprimir_resultado(conversaciones: list[Conversacion], ruta_archivo_resultad
                     f"\n"
                 )) 
 
-def imprimir_resultado_json(conversaciones: list[Conversacion], ruta_archivo_resultado: str) -> None:
+def imprimir_resultado_json(conversaciones: list[Conversacion], ruta_archivo_resultado: str, archivo_pcap : str = "undefined", borrar_json : bool = True) -> None:
     """Imprime las conversaciones sospechosas en JSON, con el mismo formato que el script de Sangeen.
-    Los resultados se acumulan sobre el archivo existente, para poder ir juntando varias ejecuciones."""
+    Los resultados se acumulan sobre el archivo existente, para poder ir juntando varias ejecuciones si borrar_json = false. Por defecto, sobreescribimos"""
 
     archivoOutput = os.path.join(ruta_archivo_resultado, ARCHIVO_RESULTADO_JSON)
 
-    if os.path.exists(archivoOutput):
+    if os.path.exists(archivoOutput) and not(borrar_json):
         with open(archivoOutput, "r", encoding="utf-8") as json_file:
             data = json.load(json_file)
     else:
@@ -74,7 +74,9 @@ def imprimir_resultado_json(conversaciones: list[Conversacion], ruta_archivo_res
             'ipDestination': conv.dstIp,
             'protocol': conv.protocolo,
             'portsDestination': sorted({int(c[3]) for c in conv.conexiones}),
-            'startTime': conv.conexiones[0][0]
+            'entropy' : conv.h,
+            'startTime': conv.conexiones[0][0],
+            'file' : archivo_pcap
         })
 
     with open(archivoOutput, "w", encoding="utf-8") as json_file:
@@ -86,7 +88,7 @@ def es_sospechosa(conversacion: Conversacion) -> bool:
     """Decide si una conversación es sospechosa y merece aparecer en la lista final"""
     esta_limpia = conversacion.sospechosa
     tiene_suficientes_intentos = len({c[3] for c in conversacion.conexiones}) > THRESHOLD_PUERTOS_UNICOS
-    tiene_entropia_suficiente = conversacion.h > THRESHOLD_ENTROPIA 
+    tiene_entropia_suficiente = True # conversacion.h > THRESHOLD_ENTROPIA 
     #En TCP la falta de intercambio ya la filtra el criterio de bytes al construir la conversación
     mayoria_sin_respuesta = (
         conversacion.protocolo != "UDP"

@@ -96,7 +96,7 @@ def detectar_escaneos_verticales(flujos: list[Flujo]) -> list[Candidato]:
 
     candidatos = []
     for key, flujosDelGrupo in groups.items():
-        puertosDestino = [f.dstPort for f in flujosDelGrupo]  
+        puertosDestino = {f.dstPort for f in flujosDelGrupo}  # puertos únicos para el filtro  
         if cacular_peso_total(puertosDestino) >= UMBRAL_PESO_VERTICAL:
             candidatos.append(
                 Candidato(

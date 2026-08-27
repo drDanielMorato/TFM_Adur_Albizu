@@ -30,6 +30,31 @@ def localizar_archivos_flujos(ruta_directorio: str) -> tuple[str, str]:
 
     return archivos_tcp[0], archivos_udp[0]
 
+def localizar_archivos_flujos_opcionales(ruta_directorio: str) -> tuple[str | None, str | None]:
+    """
+    Igual que localizar_archivos_flujos, pero permite que falte TCP o UDP.
+    """
+    archivos_tcp = []
+    archivos_udp = []
+
+    for nombre in os.listdir(ruta_directorio):
+        ruta = os.path.join(ruta_directorio, nombre)
+        if not os.path.isfile(ruta):
+            continue
+        if PATRON_TCP in nombre:
+            archivos_tcp.append(ruta)
+        elif PATRON_UDP in nombre:
+            archivos_udp.append(ruta)
+
+    if len(archivos_tcp) > 1:
+        raise RuntimeError(f"Se esperaba como mucho un archivo con '{PATRON_TCP}' en {ruta_directorio}, encontrados: {archivos_tcp}")
+    if len(archivos_udp) > 1:
+        raise RuntimeError(f"Se esperaba como mucho un archivo con '{PATRON_UDP}' en {ruta_directorio}, encontrados: {archivos_udp}")
+
+    archivo_tcp = archivos_tcp[0] if archivos_tcp else None
+    archivo_udp = archivos_udp[0] if archivos_udp else None
+    return archivo_tcp, archivo_udp
+
 def leer_registros_flujo_ordenados(
     ruta_archivo: str,
     columna_timestamp: int,
@@ -86,3 +111,10 @@ def leer_registros_flujo_ordenados(
                 #Al acabar el archivo ya no puede llegar nada anterior, así que se vacía el buffer en orden
                 timestamp_emitido, _, cols_emitidas = heapq.heappop(buffer)
                 yield timestamp_emitido, cols_emitidas
+
+def obtener_lista_archivos_pcap (directorio : str) -> list[str] :
+    # Devuelve las rutas de los archivos pcap a analizar
+    return [
+        f for f in os.listdir(directorio)
+        if os.path.isfile(os.path.join(directorio, f))
+    ]

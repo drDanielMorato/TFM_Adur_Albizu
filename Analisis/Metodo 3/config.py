@@ -55,10 +55,12 @@ THRESHOLD_PROPORCION_RESPUESTAS = 0.2 # Proporción de registros de flujo con re
 INTERVALO_ESCANEOS_DIFERENTES = 30 #Intervalo a partir del cual separo dos escaneos a una misma IP
 
 # Ventana del buffer de reordenado: cuanto mayor, más desorden tolera a costa de más memoria
-VENTANA_REORDENADO = 600.0
+VENTANA_REORDENADO = 2000.0
 
 #Rangos internos IP de la uni: 130.206.158.0 - 130.206.175.255
 RANGOS_INTERNOS =["130.206.158.0/23", #130.206.158.0 - 130.206.159.255 
                   "130.206.160.0/20"] #130.206.160.0 - 130.206.175.255
 
 REDES_INTERNAS = [ipaddress.ip_network(r, strict=False) for r in RANGOS_INTERNOS]
+
+RUTA_BINARIO_PROCESACONEXIONES = "/bin/procesaConexiones/procesaConexiones"
