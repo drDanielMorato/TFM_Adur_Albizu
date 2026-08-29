@@ -28,6 +28,7 @@ def main() -> None:
         total_pcaps = len(archivos_pcap)
         pcaps_procesados = 0
         pcaps_omitidos = 0
+        borrar_json = True
 
         for archivo_entrada in archivos_pcap:
             ruta_completa = os.path.join(ruta_archivos_pcaps, archivo_entrada)
@@ -65,11 +66,18 @@ def main() -> None:
             for conv in conversaciones:
                 calcular_h(conv)
 
+            print(f"procesando {ruta_completa}...")
             imprimirEstadisticas(conversaciones, contadorRegistrosFlujo)
 
             # Imprimimos resultado en terminal:
             # imprimir_resultado(conversaciones, ruta_archivo_resultado)
-            imprimir_resultado_json(conversaciones, ruta_archivo_resultado, archivo_entrada, False)
+            imprimir_resultado_json(
+                conversaciones,
+                ruta_archivo_resultado,
+                ruta_completa,
+                borrar_json=borrar_json,
+            )
+            borrar_json = False
             pcaps_procesados += 1
 
         print(

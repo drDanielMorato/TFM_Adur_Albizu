@@ -31,13 +31,19 @@ def procesar_archivo_flujos_tcp(archivo_tcp: str) -> tuple[list[Conversacion], i
         except (IndexError, ValueError) as e:
             raise RuntimeError(f"  ERROR: {e} | línea: {b' '.join(cols)[:80]}")
 
-        conversacion = ObtenerOCrearConversacion(conversaciones, ultimaConversacionPorPareja, srcIp, dstIp, first_packet_time, "TCP")
+        conversacion = ObtenerOCrearConversacion(
+            conversaciones,
+            ultimaConversacionPorPareja,
+            srcIp,
+            dstIp,
+            first_packet_time,
+            "TCP",
+        )
+        conversacion.flujosTotales += 1
 
-        if (aniadir_registro_flujo_tcp(bytes_sd, bytes_ds)):
-            
-            conversacion.update(srcPort, dstPort, first_packet_time , last_packet_time)
-        else:
-            conversacion.sospechosa = False
+        if aniadir_registro_flujo_tcp(bytes_sd, bytes_ds):
+            conversacion.flujosSondeo += 1
+            conversacion.update(srcPort, dstPort, first_packet_time, last_packet_time)
 
         contadorRegistrosFlujo  += 1
         if contadorRegistrosFlujo % 5_000_000 == 0:
@@ -74,9 +80,9 @@ def procesar_archivo_flujos_udp(archivo_udp: str) -> tuple[list[Conversacion], i
 
         conversacion = ObtenerOCrearConversacion(conversaciones, ultimaConversacionPorPareja, srcIp, dstIp, first_packet_time, "UDP")
 
-        #Sin establecimiento de conexión el volumen de datos no distingue un sondeo de una petición legítima, así que aquí no se veta ningún registro: solo se anota si hubo respuesta
-        if bytes_ds > 0:
-            conversacion.registrosConRespuesta += 1
+        conversacion.flujosTotales += 1
+        if bytes_ds == 0:
+            conversacion.flujosSondeo += 1
 
         conversacion.update(srcPort, dstPort, first_packet_time , last_packet_time)
 

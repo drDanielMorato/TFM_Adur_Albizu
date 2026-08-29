@@ -86,13 +86,16 @@ def imprimir_resultado_json(conversaciones: list[Conversacion], ruta_archivo_res
 
 def es_sospechosa(conversacion: Conversacion) -> bool:
     """Decide si una conversación es sospechosa y merece aparecer en la lista final"""
-    esta_limpia = conversacion.sospechosa
     tiene_suficientes_intentos = len({c[3] for c in conversacion.conexiones}) > THRESHOLD_PUERTOS_UNICOS
     tiene_entropia_suficiente = True # conversacion.h > THRESHOLD_ENTROPIA 
-    #En TCP la falta de intercambio ya la filtra el criterio de bytes al construir la conversación
-    mayoria_sin_respuesta = (
-        conversacion.protocolo != "UDP"
-        or conversacion.registrosConRespuesta <= THRESHOLD_PROPORCION_RESPUESTAS * len(conversacion.conexiones)
-    )
+    proporcion_sondeos = conversacion.flujosSondeo / conversacion.flujosTotales
+    if conversacion.protocolo == "TCP":
+        proporcion_sondeos_suficiente = proporcion_sondeos > THRESHOLD_PROPORCION_SONDEOS_TCP
+    else:
+        proporcion_sondeos_suficiente = proporcion_sondeos > THRESHOLD_PROPORCION_SONDEOS_UDP
 
-    return esta_limpia and tiene_suficientes_intentos and tiene_entropia_suficiente and mayoria_sin_respuesta
+    return (
+        tiene_suficientes_intentos
+        and tiene_entropia_suficiente
+        and proporcion_sondeos_suficiente
+    )

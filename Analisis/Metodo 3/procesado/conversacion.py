@@ -21,11 +21,9 @@ class Conversacion:
     #Computaciones finales
     h: float | None = None  # Entropia de Shannon normalizada
 
-    # Sospechosa: Es una conversación sospechosa   
-    sospechosa: bool = True
-
-    # Registros de flujo en los que el destino devolvió datos: en un escaneo la mayoría de sondeos se quedan sin respuesta
-    registrosConRespuesta: int = 0
+    # Registros totales y compatibles con el criterio de sondeo del protocolo
+    flujosTotales: int = 0
+    flujosSondeo: int = 0
 
     #Método de actualización
     def update(self, puerto_src, puerto_dst, t_inicio, t_fin) -> None:
