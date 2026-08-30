@@ -56,7 +56,7 @@ THRESHOLD_PROPORCION_SONDEOS_UDP = 0.9 # Proporción mínima de flujos UDP sin r
 INTERVALO_ESCANEOS_DIFERENTES = 30 #Intervalo a partir del cual separo dos escaneos a una misma IP
 
 # Ventana del buffer de reordenado: cuanto mayor, más desorden tolera a costa de más memoria
-VENTANA_REORDENADO = 2000.0
+VENTANA_REORDENADO = 32000.0
 
 #Rangos internos IP de la uni: 130.206.158.0 - 130.206.175.255
 RANGOS_INTERNOS =["130.206.158.0/23", #130.206.158.0 - 130.206.159.255 
