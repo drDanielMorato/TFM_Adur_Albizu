@@ -23,7 +23,7 @@ def evaluar_predicciones(ground_truth: dict, predictions: list, tolerance: float
 
             ip_prediccion = prediction["ipSource"]
             if attacker_time is None:
-                print(f"la ip {ip_prediccion} no está en el ground truth")
+                print(f"la ip {ip_prediccion} no está en el ground truth, en {file_path}")
                 continue
 
             time_difference = abs(float(prediction["startTime"]) - float(attacker_time))
@@ -53,7 +53,7 @@ def evaluar_predicciones(ground_truth: dict, predictions: list, tolerance: float
     number_ip_ground_truth_file = sum([1 for _, attacker_ips in ground_truth.items()
                                    for _ in attacker_ips])
 
-    print(f"ataques d: {ataques_detectados}")
+    # print(f"ataques d: {ataques_detectados}")
     return {
         "number_of_predictions" : len(predictions),
         "positives": positives,

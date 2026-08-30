@@ -32,49 +32,68 @@ def _leer_paquetes_sin_ordenar(directorio: str) -> Iterator[DatosPaquete]:
         print(f"  Leyendo {ruta_pcap}...")
         with io.BufferedReader(gzip.GzipFile(ruta_pcap, "rb"), buffer_size=4 * 1024 * 1024) as f:
             lector = dpkt.pcap.Reader(f)
-            # if lector.datalink() != dpkt.pcap.DLT_EN10MB:
-            #     raise ValueError(f"Linktype no soportado en {ruta_pcap}: {lector.datalink()} (se asume Ethernet)")
-            #     # para ver si el tipo de enlace es ethernet, que es lo que se asume en el slicing de bytes más abajo (offsets fijos para cabeceras Ethernet/IP/TCP/UDP)
-            
-            for timestamp, buf in lector:
-                if len(buf) < 34:  # 14 (Ethernet) + 20 (IP mínimo)
-                    # print(f"  Ignorando paquete en {ruta_pcap} por tener pequeño: (tamaño={len(buf)})")
-                    continue
-
-                if (buf[12] << 8 | buf[13]) != ETH_TYPE_IP: # obtengo el ethertype
-                    # print(f"  Ignorando paquete en {ruta_pcap} (ethertype={buf[12] << 8 | buf[13]})")
-                    continue
-
-                ip_start = 14
-                proto = buf[ip_start + 9]
-                if proto != IP_PROTO_TCP and proto != IP_PROTO_UDP:
-                    # print(f"  Ignorando paquete en {ruta_pcap} (protocolo={proto})")
-                    continue
-
-                frag_offset = struct.unpack_from("!H", buf, ip_start + 6)[0] & 0x1FFF
-                if frag_offset != 0:
-                    # print(f"  Ignorando fragmento IP en {ruta_pcap} (offset={frag_offset})")
-                    continue  # fragmento no inicial: no lleva cabecera TCP/UDP
-                """se lee el campo fragment offset (bytes 6-7 de la cabecera IP, quedándonos con los 13 bits bajos vía & 0x1FFF) y 
-                se descarta el paquete si no es 0 (es decir, si no es el primer fragmento) — esos 
-                fragmentos no llevan cabecera TCP/UDP y antes se habrían leído como puerto destino 
-                datos que en realidad son payload."""
+            yield from _extraer_paquetes(lector, ruta_pcap)
 
 
-                ihl = (buf[ip_start] & 0x0F) * 4 # me quedo con el tamaño de la cabecera IP (en bytes)
-                l4_start = ip_start + ihl # me quedo con el offset del inicio de la cabecera TCP/UDP
-                if len(buf) < l4_start + 4:  # 4 bytes para srcPort y dstPort
-                    continue
+def leer_pcap(ruta_pcap: str) -> Iterator[DatosPaquete]:
+    """Lee los paquetes IPv4 TCP/UDP de un único archivo PCAP o PCAPNG."""
+    print(f"  Leyendo {ruta_pcap}...")
+    with open(ruta_pcap, "rb", buffering=4 * 1024 * 1024) as archivo:
+        try:
+            lector = dpkt.pcap.Reader(archivo)
+        except (ValueError, dpkt.dpkt.NeedData):
+            archivo.seek(0)
+            lector = dpkt.pcapng.Reader(archivo)
+        yield from _extraer_paquetes(lector, ruta_pcap)
 
-                dst_port, = struct.unpack_from("!H", buf, l4_start + 2) # obtengo el puerto destino (2 bytes, big-endian)
 
-                yield DatosPaquete(
-                    tStart=float(timestamp),
-                    srcIp=socket.inet_ntoa(buf[ip_start + 12: ip_start + 16]),
-                    dstIp=socket.inet_ntoa(buf[ip_start + 16: ip_start + 20]),
-                    dstPort=dst_port,
-                    ruta_pcap=ruta_pcap,
-                )
+def _extraer_paquetes(lector, ruta_pcap: str) -> Iterator[DatosPaquete]:
+    if lector.datalink() != dpkt.pcap.DLT_EN10MB:
+        raise ValueError(
+            f"Linktype no soportado en {ruta_pcap}: {lector.datalink()} "
+            "(se asume Ethernet)"
+        )
+
+    for timestamp, buf in lector:
+        if len(buf) < 34:  # 14 (Ethernet) + 20 (IP mínimo)
+            continue
+
+        if (buf[12] << 8 | buf[13]) != ETH_TYPE_IP:
+            continue
+
+        ip_start = 14
+        proto = buf[ip_start + 9]
+        if proto != IP_PROTO_TCP and proto != IP_PROTO_UDP:
+            continue
+
+        frag_offset = struct.unpack_from("!H", buf, ip_start + 6)[0] & 0x1FFF
+        if frag_offset != 0:
+            continue
+
+        ihl = (buf[ip_start] & 0x0F) * 4
+        l4_start = ip_start + ihl
+        if len(buf) < l4_start + 4:
+            continue
+
+        dst_port, = struct.unpack_from("!H", buf, l4_start + 2)
+
+        yield DatosPaquete(
+            tStart=float(timestamp),
+            srcIp=socket.inet_ntoa(buf[ip_start + 12: ip_start + 16]),
+            dstIp=socket.inet_ntoa(buf[ip_start + 16: ip_start + 20]),
+            dstPort=dst_port,
+            ruta_pcap=ruta_pcap,
+        )
+
+
+def listar_pcaps(directorio: str) -> list[str]:
+    """Lista PCAP y PCAPNG recursivamente."""
+    rutas = []
+    for raiz, _, nombres in os.walk(directorio):
+        for nombre in nombres:
+            if nombre.lower().endswith((".pcap", ".pcapng")):
+                rutas.append(os.path.join(raiz, nombre))
+    return sorted(rutas)
 
 def listar_gzs(directorio: str) -> list[str]:
     """Devuelve las rutas de los .gz del directorio, ordenadas por su timestamp (p. ej. 1513677548.gz)."""

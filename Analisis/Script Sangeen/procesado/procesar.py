@@ -40,13 +40,24 @@ def _eliminar_flow_entries_expiradas(
 
 def procesar(ruta_archivos_paquetes: str) -> list[Candidato]:
     """Procesa paquetes y devuelve las flow entries que parecen escaneos."""
-    from typing import Iterator
     from utils import leer_paquetes  
+
+    return _procesar_paquetes(leer_paquetes(ruta_archivos_paquetes))
+
+
+def procesar_pcap(ruta_pcap: str) -> list[Candidato]:
+    """Procesa un PCAP independiente con un estado de detección nuevo."""
+    from utils.leer_archivos import leer_pcap
+
+    return _procesar_paquetes(leer_pcap(ruta_pcap))
+
+
+def _procesar_paquetes(paquetes) -> list[Candidato]:
+    """Procesa una secuencia cronológica de paquetes."""
 
     candidatos: list[Candidato] = []
     flow_entries: dict[tuple[str, str], CamposFlowEntry] = {}
     proxima_limpieza = float("-inf")
-    paquetes: Iterator[DatosPaquete] = leer_paquetes(ruta_archivos_paquetes)
 
     # Iteramos sobre los paquetes ordenados por timestamp
     for paquete in paquetes:

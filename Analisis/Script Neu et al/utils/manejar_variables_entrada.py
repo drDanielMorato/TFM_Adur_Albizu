@@ -9,7 +9,7 @@ def parseArgs() -> argparse.Namespace:
         "--rutaOrigen",
         "-o",
         required=True,
-        help="Directorio donde se encuentra el archivo de con los registros de flujo"
+        help="Directorio de entrada con PCAPs o registros de flujo, segun el script"
     )
     parser.add_argument(
         "--rutaDestino",

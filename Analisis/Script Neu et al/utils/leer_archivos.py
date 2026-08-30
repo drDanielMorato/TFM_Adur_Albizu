@@ -24,6 +24,35 @@ def localizar_archivo_tcp(ruta_directorio: str) -> str:
     return archivos_tcp[0]
 
 
+def localizar_archivo_tcp_opcional(ruta_directorio: str) -> str | None:
+    """Devuelve el archivo TCP si existe y contiene registros."""
+    archivos_tcp = [
+        os.path.join(ruta_directorio, nombre)
+        for nombre in os.listdir(ruta_directorio)
+        if PATRON_TCP in nombre
+        and os.path.isfile(os.path.join(ruta_directorio, nombre))
+        and os.path.getsize(os.path.join(ruta_directorio, nombre)) > 0
+    ]
+
+    if len(archivos_tcp) > 1:
+        raise RuntimeError(
+            f"Se esperaba como mucho un archivo con '{PATRON_TCP}' en "
+            f"{ruta_directorio}, encontrados: {archivos_tcp}"
+        )
+
+    return archivos_tcp[0] if archivos_tcp else None
+
+
+def obtener_lista_archivos_pcap(directorio: str) -> list[str]:
+    """Devuelve rutas absolutas de PCAP y PCAPNG, buscando recursivamente."""
+    archivos_pcap = []
+    for raiz, _, nombres in os.walk(directorio):
+        for nombre in nombres:
+            if nombre.lower().endswith((".pcap", ".pcapng")):
+                archivos_pcap.append(os.path.join(raiz, nombre))
+    return sorted(archivos_pcap)
+
+
 def leer_registros_flujo_tcp_ordenados(
     ruta_archivo: str,
     ventana: float = VENTANA_REORDENADO,
