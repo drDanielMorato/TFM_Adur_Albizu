@@ -92,8 +92,7 @@ def procesar_archivo_flujos_udp(archivo_udp: str) -> tuple[list[Conversacion], i
         conversacion.flujosTotales += 1
         if bytes_ds == 0:
             conversacion.flujosSondeo += 1
-
-        conversacion.update(srcPort, dstPort, first_packet_time , last_packet_time)
+            conversacion.update(srcPort, dstPort, first_packet_time , last_packet_time)
 
         contadorRegistrosFlujo  += 1
         if contadorRegistrosFlujo % 5_000_000 == 0:

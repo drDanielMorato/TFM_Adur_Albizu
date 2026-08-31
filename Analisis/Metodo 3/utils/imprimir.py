@@ -97,5 +97,5 @@ def es_sospechosa(conversacion: Conversacion) -> bool:
     return (
         tiene_suficientes_intentos
         and tiene_entropia_suficiente
-        and proporcion_sondeos_suficiente
+        # and proporcion_sondeos_suficiente
     )
