@@ -28,6 +28,15 @@ def procesar_archivo_flujos_tcp(archivo_tcp: str) -> tuple[list[Conversacion], i
             bytes_sd        = int(cols[COL_TCPBYTES_SD_TCP])
             bytes_ds        = int(cols[COL_TCPBYTES_DS_TCP])
 
+            num_paquetes_sd = int(cols[COL_NUMPACKETS_SRC2DST_TCP])
+            num_paquetes_ds = int(cols[COL_NUMPACKETS_DST2SRC_TCP])
+
+            if (num_paquetes_sd == 0 and (0 < num_paquetes_ds <=3)):
+                #Swap para solucionar asignaciones incorrectas de cliente y servicio de procesaConexiones (casos extremos)
+                srcIp, dstIp = dstIp, srcIp
+                srcPort, dstPort = dstPort, srcPort
+                bytes_sd, bytes_ds = bytes_ds, bytes_sd
+
         except (IndexError, ValueError) as e:
             raise RuntimeError(f"  ERROR: {e} | línea: {b' '.join(cols)[:80]}")
 

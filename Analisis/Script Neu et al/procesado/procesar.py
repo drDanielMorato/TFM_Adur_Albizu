@@ -21,10 +21,18 @@ def procesar(ruta_archivo_flujos : str) -> list[Candidato]:
         try:
             srcIp = cols[COL_IP_SRC].decode()
             dstIp = cols[COL_IP_DST].decode()
+            srcPort = int(cols[COL_PORT_SRC])
             dstPort = int(cols[COL_PORT_DST])
-            numeroPaquetes = int(cols[COL_NUMERO_PAQUETES_SRC_DST]) + int(cols[COL_NUMERO_PAQUETES_DST_SRC])
+            num_paquetes_sd = int(cols[COL_NUMERO_PAQUETES_SRC_DST])
+            num_paquetes_ds = int(cols[COL_NUMERO_PAQUETES_DST_SRC])
+            numeroPaquetes = num_paquetes_sd + num_paquetes_ds
         except (IndexError, ValueError, UnicodeDecodeError) as error:
             raise RuntimeError(f"ERROR: {error} | columnas: {b' '.join(cols)[:80]}") from error
+
+        if num_paquetes_sd == 0 and 0 < num_paquetes_ds <= 3:
+            #Swap para solucionar asignaciones incorrectas de cliente y servicio de procesaConexiones (casos extremos)
+            srcIp, dstIp = dstIp, srcIp
+            srcPort, dstPort = dstPort, srcPort
 
         if tiempoInicioVentana is None:
             tiempoInicioVentana = tstart

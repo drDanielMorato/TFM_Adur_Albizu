@@ -77,8 +77,8 @@ def main():
     parser.add_argument(
         "--tolerance",
         type=float,
-        default=0.001,
-        help="Timestamp máximo de diferencia (default: 1 ms).",
+        default=1,
+        help="Timestamp máximo de diferencia (default: 1 s).",
     )
     args = parser.parse_args()
 
