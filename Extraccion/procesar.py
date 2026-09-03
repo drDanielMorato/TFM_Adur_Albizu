@@ -1,8 +1,9 @@
 # Este script se utilizará para generar registros de flujo mediante procesaConexiones. 
 # ProcesaConexiones se lanzará con sus opciones básicas y una serie de modulos, 
 # los cuales pueden ser configurados a través su archivo de configuraciones (p. ej.ConfiguracionesProcesaConexiones.txt)
-__version__ = "1.4.0"
+__version__ = "1.4.2"
 
+import resource
 import subprocess
 import sys
 import time
@@ -54,7 +55,7 @@ SRCMAC_DST2SRC = 25
 DSTMAC_DST2SRC = 26
 MOREMACSEEN = 27
 
-# Variables que almacenarán las onfiguraciones del config.ini
+# Variables que almacenarán las configuraciones del config.ini
 RUTA_PLANTILLACONFIGURACIONES_PROCESACONEXIONES = ""
 RUTA_BINARIO_PROCESACONEXIONES = ""
 RUTA_BINARIO_TSERIES = ""     
@@ -269,7 +270,7 @@ def prepararFicheroConfiguracionesProcesaConexionesSeries(directorioInput: str, 
     with open(rutaConfiguracionesProcesaConexiones, 'w') as f:
         f.write(contenido)
 
-    return rutaConfiguracionesProcesaConexiones
+    return (rutaConfiguracionesProcesaConexiones, len(direcciones))
 
 def extraerEstadisticasGlobalesYGuardarEnArchivo(directorioOutput: str) -> None:
     """
@@ -327,9 +328,17 @@ def lanzarProcesaConexionesSeries(directorioInput: str, directorioOutput: str) -
     logging.info("Inicio lanzarProcesaConexiones")
 
     #1- Preparamos el archivo de configuraciones que le llega como input a procesaConexiones
-    rutaConfiguracionesProcesaConexiones = prepararFicheroConfiguracionesProcesaConexionesSeries(
+    (rutaConfiguracionesProcesaConexiones, numFiltros) = prepararFicheroConfiguracionesProcesaConexionesSeries(
         directorioInput, directorioOutput
     )
+
+    # 1.5 - Subir límite de ficheros abiertos
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(
+        resource.RLIMIT_NOFILE,
+        (numFiltros * 2 + 200, hard)
+    )
+    logging.info("Subido el limite de ficheros abiertos a " + str(numFiltros * 2 + 200))
 
     #2- Ejecución de procesaConexiones: 
     comando = [RUTA_BINARIO_PROCESACONEXIONES , "--configFile", rutaConfiguracionesProcesaConexiones]
@@ -339,10 +348,6 @@ def lanzarProcesaConexionesSeries(directorioInput: str, directorioOutput: str) -
 
     if result.returncode != 0:
         raise RuntimeError(f"El comando procesaConexiones falló: {result.stderr.strip()}")
-
-    #3- Creamos archivos en el directorio de salida con los filtros BPF aplicados y las estadísticas globales de procesaConexiones    
-    extraerFiltrosBpfProcesaConexionesYGuardarEnArchivo(rutaConfiguracionesProcesaConexiones, directorioOutput)
-    extraerEstadisticasGlobalesYGuardarEnArchivo(directorioOutput)
 
     logging.info("Fin lanzarProcesaConexiones")
 
@@ -597,7 +602,7 @@ def crearArchivoFiltrosBPFallHosts(directorioOutput: str) -> str:
             f.write("\n")
 
     logging.info(f"Filtros BPF All Hosts escritos en: {ruta}")
-    return ruta
+    return (ruta, len(ips))
 
 def crearArchivoFiltrosNETsAllHosts(directorioOutput: str) -> str:
     """
@@ -640,7 +645,7 @@ def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
     # 1- Preparamos archivos que tseries (herramienta) necesita
     logging.info("Construyendo los filtros...")
     #rutaFiltros = crearArchivoFiltrosBPF(directorioOutput)
-    rutaFiltros = crearArchivoFiltrosBPFallHosts(directorioOutput)
+    rutaFiltros, numFiltros = crearArchivoFiltrosBPFallHosts(directorioOutput)
     #rutaFiltros = crearArchivoFiltrosNETsAllHosts(directorioOutput)
     logging.info("Filtros listos")
     rutaLista = crearFicheroListaGz(directorioInput, directorioOutput)
@@ -654,6 +659,14 @@ def lanzarTseries(directorioInput: str, directorioOutput: str) -> None:
 
     if result.returncode != 0:
         raise RuntimeError(f"El comando tseries falló: {result.stderr.strip()}")
+
+    # 2.5 - Subir límite de ficheros abiertos
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(
+        resource.RLIMIT_NOFILE,
+        (numFiltros * 2 + 200, hard)
+    )
+    logging.info("Subido el limite de ficheros abiertos a " + str(numFiltros * 2 + 200))
 
     # 3 - Se guarda resultado en fichero de salida 
     rutaDestino = os.path.join(directorioOutput, ARCHIVO_SALIDA_TSERIES)
