@@ -45,9 +45,7 @@ PATRON_UDP = "_udp_"
 ARCHIVO_RESULTADO = "resultado.txt"
 ARCHIVO_RESULTADO_JSON = "resultado_metodo3.json"
 
-LIMITE_PUERTOS= 10 #Limite por debajo del cual supongo más dudoso un escaneo de puertos
-
-THRESHOLD_PUERTOS_UNICOS = 20 # Limite por encima del cual considero que una conversación podría ser un escaneo
+THRESHOLD_PUERTOS_UNICOS = 10 # Limite por encima del cual considero que una conversación podría ser un escaneo
 THRESHOLD_ENTROPIA = 0.98 # Limite de h por encima del cual considero que una conversación podría ser un escaneo
 THRESHOLD_PROPORCION_SONDEOS_TCP = 0.9 # La proporción de flujos TCP compatibles con un sondeo debe superar este valor
 THRESHOLD_PROPORCION_SONDEOS_UDP = 0.9 # Proporción mínima de flujos UDP sin respuesta
