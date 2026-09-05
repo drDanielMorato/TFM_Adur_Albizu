@@ -87,7 +87,7 @@ def imprimir_resultado_json(conversaciones: list[Conversacion], ruta_archivo_res
 def es_sospechosa(conversacion: Conversacion) -> bool:
     """Decide si una conversación es sospechosa y merece aparecer en la lista final"""
     tiene_suficientes_intentos = len({c[3] for c in conversacion.conexiones}) > THRESHOLD_PUERTOS_UNICOS
-    tiene_entropia_suficiente = True # conversacion.h > THRESHOLD_ENTROPIA 
+    tiene_entropia_suficiente = conversacion.h >= THRESHOLD_ENTROPIA 
     proporcion_sondeos = conversacion.flujosSondeo / conversacion.flujosTotales
     if conversacion.protocolo == "TCP":
         proporcion_sondeos_suficiente = proporcion_sondeos > THRESHOLD_PROPORCION_SONDEOS_TCP
