@@ -51,7 +51,7 @@ THRESHOLD_PROPORCION_SONDEOS_TCP = 0.9 # La proporción de flujos TCP compatible
 THRESHOLD_PROPORCION_SONDEOS_UDP = 0.9 # Proporción mínima de flujos UDP sin respuesta
 
 # Ventana temporal 
-INTERVALO_ESCANEOS_DIFERENTES = 300 #Intervalo a partir del cual separo dos escaneos a una misma IP
+INTERVALO_ESCANEOS_DIFERENTES = 30 #Intervalo a partir del cual separo dos escaneos a una misma IP
 
 # Ventana del buffer de reordenado: cuanto mayor, más desorden tolera a costa de más memoria
 VENTANA_REORDENADO = 32000.0
