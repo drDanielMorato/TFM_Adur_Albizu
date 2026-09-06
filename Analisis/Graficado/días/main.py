@@ -4,7 +4,7 @@ que necesitamos
 """
 
 import argparse
-from implementaciones import generarHistogramaNumeroPuertos, generarHistogramaNumeroPuertosLogaritmico, generarGraficoPorcentajeTraficoGlobalParaConversacionesConNPuertosUnicos, generarGraficoEntropiaParaConversacionNPuertosUnicos, generarGraficoCDFPuertosUnicos
+from implementaciones import generarHistogramaNumeroPuertos, generarHistogramaNumeroPuertosLogaritmico, generarGraficoPorcentajeTraficoGlobalParaConversacionesConNPuertosUnicos, generarGraficoEntropiaParaConversacionNPuertosUnicos, generarGraficoCDFPuertosUnicos, generarHistogramaNumeroPuertosPorProtocolo, generarGraficoActividadTemporalAtaques
 import matplotlib.pyplot as plt
 
 def main():
@@ -24,6 +24,9 @@ def main():
     generarGraficoEntropiaParaConversacionNPuertosUnicos(args, 6)
 
     generarGraficoCDFPuertosUnicos(args, 7)
+    generarHistogramaNumeroPuertosPorProtocolo(args, "TCP", "Distribution of TCP Conversations by Number of Unique Ports", 8)
+    generarHistogramaNumeroPuertosPorProtocolo(args, "UDP", "Distribution of UDP Conversations by Number of Unique Ports", 9)
+    generarGraficoActividadTemporalAtaques(args, 10)
     # print("hola")
     plt.show()
 

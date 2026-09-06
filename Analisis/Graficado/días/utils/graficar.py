@@ -9,6 +9,8 @@ import mmap
 import io
 import os
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.ticker import MaxNLocator
  
 def leerColumna(ruta_txt, columna, separador=None):
     """
@@ -134,6 +136,36 @@ def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecu
         plt.savefig(guardar_como, dpi=150)
         # print(f"Plot guardado en: {guardar_como}")
    
+
+
+def graficar_actividad_temporal_protocolos(tiempos, actividad_por_protocolo, titulo="Temporal Activity by Protocol", guardar_como=None, figura=1, zona_horaria=None):
+    """Plots the number of active attacks over time by protocol."""
+    plt.figure(figura, figsize=(12, 6))
+
+    colores = {
+        "TCP": "steelblue",
+        "UDP": "darkorange"
+    }
+
+    for protocolo, actividad in actividad_por_protocolo.items():
+        plt.step(tiempos, actividad, where="mid", label=protocolo, color=colores.get(protocolo, None), linewidth=1.8)
+
+    plt.title(titulo)
+    plt.xlabel("time (UTC+1)")
+    plt.ylabel("active attacks")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    ax = plt.gca()
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m %H:%M", tz=zona_horaria))
+    plt.xticks(rotation=30, ha="right")
+    plt.tight_layout()
+
+    if guardar_como:
+        plt.savefig(guardar_como, dpi=150)
+
 
 
 
