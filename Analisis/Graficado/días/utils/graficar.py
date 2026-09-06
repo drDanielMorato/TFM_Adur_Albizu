@@ -16,7 +16,7 @@ def leerColumna(ruta_txt, columna, separador=None):
     Usa mmap para mapear el archivo en memoria en vez de leerlo por bloques.
     """
     x = []
-    count = 0
+    count = 1
     with open(ruta_txt, "rb") as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mapa:
             # mmap nos da bytes; csv.reader necesita texto, así que
@@ -26,9 +26,11 @@ def leerColumna(ruta_txt, columna, separador=None):
                 linea = linea.strip()
                 if not linea:  # saltar líneas vacías
                     continue
-                if count > 3:
+                if count > 2:
                     partes = linea.split(separador)
                     x.append(float(partes[columna]))
+                    # if count ==4:
+                    #     print("holas",partes[0])
                 count+=1
     return x
 
@@ -39,7 +41,7 @@ def leerColumnas(ruta_txt, columna1, columna2 = None, separador=None):
     """
     x = []
     y = [] 
-    count = 0
+    count = 1
     with open(ruta_txt, "rb") as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mapa:
             # mmap nos da bytes; csv.reader necesita texto, así que
@@ -49,11 +51,14 @@ def leerColumnas(ruta_txt, columna1, columna2 = None, separador=None):
                 linea = linea.strip()
                 if not linea:  # saltar líneas vacías
                     continue
-                if count > 3:
+                if count > 2:
                     partes = linea.split(separador)
                     x.append(partes[columna1])
                     y.append(partes[columna2])
+                    # if count ==4:
+                    #     print("holas",partes[0])
                 count+=1
+                
     return x,y
 
 
@@ -70,7 +75,7 @@ def calcular_histograma_simple(valores, guardar_csv=None):
             writer = csv.writer(f)
             writer.writerow(["x", "frecuencia"])
             writer.writerows(zip(x, frecuencia))
-        print(f"CSV guardado en: {outputFile}")
+        # print(f"CSV guardado en: {outputFile}")
 
     return x, frecuencia
 
@@ -107,7 +112,7 @@ def graficar_histograma_frecuencias(x, frecuencia, titulo="Histograma",
  
     if guardar_como:
         plt.savefig(guardar_como, dpi=150)
-        print(f"Histograma guardado en: {guardar_como}")
+        # print(f"Histograma guardado en: {guardar_como}")
 
     
 def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecuencia", guardar_como=None, maxEjeX = None, figura = 1):
@@ -127,7 +132,7 @@ def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecu
  
     if guardar_como:
         plt.savefig(guardar_como, dpi=150)
-        print(f"Plot guardado en: {guardar_como}")
+        # print(f"Plot guardado en: {guardar_como}")
    
 
 

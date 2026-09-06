@@ -22,8 +22,9 @@ def main():
     generarHistogramaNumeroPuertosLogaritmico(args, 4)
     generarGraficoPorcentajeTraficoGlobalParaConversacionesConNPuertosUnicos(args, 5)
     generarGraficoEntropiaParaConversacionNPuertosUnicos(args, 6)
+
     generarGraficoCDFPuertosUnicos(args, 7)
-    print("hola")
+    # print("hola")
     plt.show()
 
 if __name__ == "__main__":

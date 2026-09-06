@@ -1,6 +1,7 @@
 from utils.graficar import leerColumna, leerColumnas, calcular_histograma_simple, graficar_histograma_frecuencias, graficar_curva
-from utils.estadisticas import calcularPorcentajesDeTotalFlujos, calcularMediaPorGrupo, CDF, filtrarPorIpSrc
+from utils.estadisticas import *
 import argparse
+import numpy as np
 
 def generarHistogramaNumeroPuertos(args, filtrar = False, quedarmeConInterna = False, titulo = "", numFigura = 1):
     """ Genera el histograma del números de puertos únicos, teniendo en cuenta
@@ -9,8 +10,18 @@ def generarHistogramaNumeroPuertos(args, filtrar = False, quedarmeConInterna = F
     x,z = leerColumnas(args.archivo, 11, 7)
     x = [float(xi) for xi in x]
 
+    total_number_attacks = len(x)
+
     if filtrar:
         x = filtrarPorIpSrc(x,z,quedarmeConInterna)
+
+        number_filtered_attacks = len(x)
+        percentage = number_filtered_attacks / total_number_attacks *100
+        tipo_ataque = "outcoming" if quedarmeConInterna else "incoming"
+
+        print (f"Number of {tipo_ataque} attacks: {number_filtered_attacks} ")
+        print (f"Percentage of {tipo_ataque} attacks: {percentage:.2f} %")
+
 
     x,f = calcular_histograma_simple(x, args.directorioGuardado)
     
@@ -31,7 +42,7 @@ def generarGraficoPorcentajeTraficoGlobalParaConversacionesConNPuertosUnicos(arg
     y X es conversaciones con N puertos únicos
     """
     x = leerColumna(args.archivo, 11)
-    print(f"longitud columna {len(x)}" )
+    # print(f"longitud columna {len(x)}" )
     x,f = calcular_histograma_simple(x, args.directorioGuardado)
     
     numeroConversacionesTotal = 395431
@@ -59,3 +70,7 @@ def generarGraficoCDFPuertosUnicos(args, numFigura = 1):
     x = leerColumna(args.archivo, 11)
     x,y = CDF(x)
     graficar_curva(x, y, "CDF", "unique ports", "CDF", args.directorioGuardado, 10001, numFigura)
+
+    obtener_percentiles(x)
+
+

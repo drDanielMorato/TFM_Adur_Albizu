@@ -52,3 +52,18 @@ def filtrarPorIpSrc(x,z,quedarmeConInterna):
     """
     return [xi for xi, zi in zip(x, z) if esIpInterna(zi) == quedarmeConInterna]
 
+def obtener_percentiles(x) -> None:
+    p25 = np.percentile(x, 25)
+    print(f"Percentile 25: {p25} ")
+    
+    p50 = np.percentile(x, 50)
+    print(f"Percentile 50: {p50} ")
+
+    p75 = np.percentile(x, 75)
+    print(f"Percentile 75: {p75} ")
+    
+    p90 = np.percentile(x, 90)
+    print(f"Percentile 90: {p90} ")
+
+    p99 = np.percentile(x, 99)
+    print(f"Percentile 99: {p99} ")
