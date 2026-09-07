@@ -82,7 +82,8 @@ def procesar_archivo_flujos_udp(archivo_udp: str) -> tuple[list[Conversacion], i
             last_packet_time   = float(cols[COL_LASTPACKETTIME_UDP])
 
             # Bytes transferidos
-            bytes_ds        = int(cols[COL_UDPBYTES_DS_UDP])
+            bytes_sd = int(cols[COL_UDPBYTES_SD_UDP])
+            bytes_ds = int(cols[COL_UDPBYTES_DS_UDP])
 
         except (IndexError, ValueError) as e:
             raise RuntimeError(f"  ERROR: {e} | línea: {b' '.join(cols)[:80]}")
@@ -90,7 +91,7 @@ def procesar_archivo_flujos_udp(archivo_udp: str) -> tuple[list[Conversacion], i
         conversacion = ObtenerOCrearConversacion(conversaciones, ultimaConversacionPorPareja, srcIp, dstIp, first_packet_time, "UDP")
 
         conversacion.flujosTotales += 1
-        if bytes_ds == 0:
+        if bytes_ds == 0 and bytes_sd == 0:
             conversacion.flujosSondeo += 1
             conversacion.update(srcPort, dstPort, first_packet_time , last_packet_time)
 

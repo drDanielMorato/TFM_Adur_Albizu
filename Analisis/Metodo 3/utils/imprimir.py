@@ -43,7 +43,7 @@ def imprimir_resultado(conversaciones: list[Conversacion], ruta_archivo_resultad
                 t_first_human = datetime.datetime.fromtimestamp(t_first, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
                 t_last_human = datetime.datetime.fromtimestamp(t_last, datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-                puertoDestino = ",".join(f"{c[3]}" for c in conv.conexiones)
+                puertoDestino = ",".join(c[3] for c in sorted(conv.conexiones, key=lambda c: int(c[3])))
                  
                 f.write((
                     f"{t_first:<16.2f} {t_last:<16.2f} {t_first_human:<20} {t_last_human:<20} {conv.protocolo:<5} {conv.srcIp:<15} {conv.dstIp:<15}"

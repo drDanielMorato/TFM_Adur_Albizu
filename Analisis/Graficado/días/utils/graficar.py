@@ -148,7 +148,7 @@ def graficar_actividad_temporal_protocolos(tiempos, actividad_por_protocolo, tit
     }
 
     for protocolo, actividad in actividad_por_protocolo.items():
-        plt.step(tiempos, actividad, where="mid", label=protocolo, color=colores.get(protocolo, None), linewidth=1.8)
+        plt.step(tiempos, actividad, where="mid", label=protocolo, color=colores.get(protocolo, None), linewidth=1.2)
 
     plt.title(titulo)
     plt.xlabel("time (UTC+1)")
