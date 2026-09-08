@@ -50,7 +50,7 @@ def imprimir_estadisticas_por_dia(estadisticas: dict[datetime.date, dict[str, di
         protocolo: {"registros": 0, "conversaciones": 0, "sospechosas": 0, "desordenados": 0}
         for protocolo in protocolos
     }
-    lineas = [f"{'Día':<12} {'Proto':<6} {'Registros':>14} {'Conversaciones':>16} {'Sospechosas':>13} {'% Sospechosas':>14} {'Desordenados':>14} {'% Desordenados':>15}"]
+    lineas = [f"{'Day':<12} {'Proto':<6} {'Registers':>14} {'Conversations':>16} {'Suspicious':>13} {'% Suspicious':>14} {'Disordered':>14} {'% Disordered':>15}"]
 
     def formatear(nombre: str, protocolo: str, valores: dict[str, int]) -> str:
         porcentaje = valores["sospechosas"] / valores["conversaciones"] * 100 if valores["conversaciones"] else 0
@@ -72,7 +72,7 @@ def imprimir_estadisticas_por_dia(estadisticas: dict[datetime.date, dict[str, di
         clave: sum(totales[protocolo][clave] for protocolo in protocolos)
         for clave in ("registros", "conversaciones", "sospechosas", "desordenados")
     }
-    lineas.append(formatear("TOTAL", "AMBOS", total))
+    lineas.append(formatear("TOTAL", "BOTH", total))
 
     contenido = "\n".join(lineas)
     with open(archivoOutput, "w", encoding="utf-8") as f:

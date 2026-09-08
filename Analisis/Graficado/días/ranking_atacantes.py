@@ -39,7 +39,7 @@ def generarRankingAtacantes(archivo=ARCHIVO_ENTRADA, directorioGuardado=None):
             campos = texto.split(maxsplit=12)
             try:
                 if len(campos) != 13:
-                    raise ValueError("se esperaban 13 campos, incluida la lista Target Ports")
+                    raise ValueError("13 fields were expected, included the Target Ports list")
                 float(campos[0])
                 float(campos[1])
                 fecha_inicio = datetime.strptime(campos[2], "%Y-%m-%d").date()
@@ -47,7 +47,7 @@ def generarRankingAtacantes(archivo=ARCHIVO_ENTRADA, directorioGuardado=None):
                 protocolo, origen, destino = campos[6].upper(), campos[7], campos[8]
                 puertos = {int(puerto) for puerto in campos[12].split(",")}
                 if any(puerto < 0 or puerto > 65535 for puerto in puertos):
-                    raise ValueError("puerto fuera del rango 0–65535")
+                    raise ValueError("port outside the 0–65535 range")
             except ValueError as error:
                 raise ValueError(f"{archivo}, línea {numero_linea}: {error}") from error
 
@@ -57,8 +57,8 @@ def generarRankingAtacantes(archivo=ARCHIVO_ENTRADA, directorioGuardado=None):
 
     rankings = {}
     lineas_txt = []
-    cabecera = (f"{'Puesto':<8} {'Proto':<7} {'IP atacante':<39} {'N.º víctimas':>12} "
-                f"{'Media puertos únicos/víctima':>28}")
+    cabecera = (f"{'Rank':<8} {'Proto':<7} {'Attacker IP':<39} {'No. of victims':>12} "
+                f"{'Mean unique ports/victim':>28}")
     for protocolo, atacantes in sorted(contactos.items()):
         filas = []
         for atacante, victimas in atacantes.items():
@@ -77,7 +77,7 @@ def generarRankingAtacantes(archivo=ARCHIVO_ENTRADA, directorioGuardado=None):
             fila["puesto"] = puesto
         rankings[protocolo] = filas
 
-        lineas_txt.extend([f"\nRanking de atacantes — {protocolo}",
+        lineas_txt.extend([f"\nRanking of attackers — {protocolo}",
                            cabecera, "-" * len(cabecera)])
         if not filas:
             lineas_txt.append("No hay IPs que hayan contactado más de 2 víctimas diferentes.")
@@ -98,11 +98,11 @@ def generarRankingAtacantes(archivo=ARCHIVO_ENTRADA, directorioGuardado=None):
         directorio.mkdir(parents=True, exist_ok=True)
         if not fechas:
             etiqueta_fecha = "sin_fecha"
-        elif len(fechas) == 1:
-            etiqueta_fecha = min(fechas).isoformat()
-        else:
-            etiqueta_fecha = f"{min(fechas).isoformat()}_a_{max(fechas).isoformat()}"
-        ruta_txt = directorio / f"ranking_atacantes_{etiqueta_fecha}.txt"
+        # elif len(fechas) == 1:
+        etiqueta_fecha = max(fechas).isoformat()
+        # else:
+        #     etiqueta_fecha = f"{min(fechas).isoformat()}_a_{max(fechas).isoformat()}"
+        ruta_txt = directorio / f"attackers_ranking_{etiqueta_fecha}.txt"
         ruta_txt.write_text(tabla_txt, encoding="utf-8")
         print(f"Ranking guardado en: {ruta_txt}")
 
