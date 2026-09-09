@@ -128,7 +128,7 @@ def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecu
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.tight_layout()
-    # plt.grid(True)
+    plt.grid(True, alpha=0.3)
     plt.xlim(min(x),maxEjeX)
     plt.plot(x,frecuencia,'green')
  
@@ -151,8 +151,8 @@ def graficar_actividad_temporal_protocolos(tiempos, actividad_por_protocolo, tit
         plt.step(tiempos, actividad, where="mid", label=protocolo, color=colores.get(protocolo, None), linewidth=1.2)
 
     plt.title(titulo)
-    plt.xlabel("time (UTC+1)")
-    plt.ylabel("active attacks")
+    plt.xlabel("Time (UTC+1)")
+    plt.ylabel("Active attacks")
     plt.legend()
     plt.grid(True, alpha=0.3)
 

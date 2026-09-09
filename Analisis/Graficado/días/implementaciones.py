@@ -59,7 +59,7 @@ def generarHistogramaNumeroPuertos(args, filtrar = False, quedarmeConInterna = F
 
     x,f = calcular_histograma_simple(x, args.directorioGuardado)
     
-    graficar_histograma_frecuencias(x, f, titulo, "unique ports", "frecuency", None, args.directorioGuardado, 10001, False, numFigura)
+    graficar_histograma_frecuencias(x, f, titulo, "Unique ports", "Frecuency", None, args.directorioGuardado, 10001, False, numFigura)
     
 
 def generarHistogramaNumeroPuertosPorProtocolo(args, protocolo, titulo = "", numFigura = 1):
@@ -73,7 +73,7 @@ def generarHistogramaNumeroPuertosPorProtocolo(args, protocolo, titulo = "", num
 
     ruta_guardado = os.path.join(args.directorioGuardado, f"histograma_puertos_unicos_{protocolo.lower()}.png")
     x, f = calcular_histograma_simple(puertos_unicos, args.directorioGuardado)
-    graficar_histograma_frecuencias(x, f, titulo, "unique ports", "frecuency", None, ruta_guardado, 10001, False, numFigura)
+    graficar_histograma_frecuencias(x, f, titulo, "Unique ports", "Frecuency", None, ruta_guardado, 10001, False, numFigura)
 
 
 def _leer_ataques_temporales(ruta_txt):
@@ -158,7 +158,7 @@ def generarHistogramaNumeroPuertosLogaritmico(args, numFigura = 1):
     """
     x = leerColumna(args.archivo, 11)
     x,f = calcular_histograma_simple(x, args.directorioGuardado)
-    graficar_histograma_frecuencias(x, f, "Distribution of Conversations by Number of Unique Ports", "unique ports", "log10(frecuency)", None, args.directorioGuardado, 10001, True, numFigura)
+    graficar_histograma_frecuencias(x, f, "Distribution of Conversations by Number of Unique Ports", "Unique ports", "log10(frecuency)", None, args.directorioGuardado, 10001, True, numFigura)
 
 def generarGraficoPorcentajeTraficoGlobalParaConversacionesConNPuertosUnicos(args, numFigura = 1):
     """ 
@@ -171,7 +171,7 @@ def generarGraficoPorcentajeTraficoGlobalParaConversacionesConNPuertosUnicos(arg
     
     numeroConversacionesTotal = 395431
     y = calcularPorcentajesDeTotalFlujos(numeroConversacionesTotal, f)
-    graficar_histograma_frecuencias(x, y, "Percentage of Total Conversations With a Given Number of Unique Ports", "unique ports", "percentage", None, args.directorioGuardado, 10001, False, numFigura)
+    graficar_histograma_frecuencias(x, y, "Percentage of Total Conversations With a Given Number of Unique Ports", "Unique ports", "Percentage", None, args.directorioGuardado, 10001, False, numFigura)
 
 def generarGraficoEntropiaParaConversacionNPuertosUnicos(args, numFigura = 1):
     """
@@ -185,7 +185,7 @@ def generarGraficoEntropiaParaConversacionNPuertosUnicos(args, numFigura = 1):
     medias = calcularMediaPorGrupo(x,y)
     
     x,y = zip(*medias.items()) #Desempaqueto
-    graficar_histograma_frecuencias(x, y, "Mean Conversation Entropy (H) by Unique Ports", "unique ports", "H", None, args.directorioGuardado, 10001, False, numFigura)
+    graficar_histograma_frecuencias(x, y, "Mean Conversation Entropy (H) by Unique Ports", "Unique ports", "H", None, args.directorioGuardado, 10001, False, numFigura)
 
 def generarGraficoCDFPuertosUnicos(args, numFigura = 1):
     """ 
@@ -193,7 +193,7 @@ def generarGraficoCDFPuertosUnicos(args, numFigura = 1):
     """
     x = leerColumna(args.archivo, 11)
     x,y = CDF(x)
-    graficar_curva(x, y, "CDF", "unique ports", "CDF", args.directorioGuardado, 10001, numFigura)
+    graficar_curva(x, y, "CDF", "Unique ports", "CDF", args.directorioGuardado, 10001, numFigura)
 
     obtener_percentiles(x)
 
