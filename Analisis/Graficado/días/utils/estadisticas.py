@@ -52,6 +52,18 @@ def filtrarPorIpSrc(x,z,quedarmeConInterna):
     """
     return [xi for xi, zi in zip(x, z) if esIpInterna(zi) == quedarmeConInterna]
 
+def calcular_densidad_histograma(datos, bins="auto"):
+    """Calcula una función de densidad de probabilidad a partir de un histograma normalizado.
+    Devuelve (centros_bin, densidad, anchura_bin).
+    """
+    datos = np.asarray(datos, dtype=float)
+    densidad, bordes = np.histogram(datos, bins=bins, density=True)
+    centros = (bordes[:-1] + bordes[1:]) / 2
+    anchuras = bordes[1:] - bordes[:-1]
+
+    return centros, densidad, anchuras
+
+
 def obtener_percentiles(x) -> None:
     p25 = np.percentile(x, 25)
     print(f"Percentile 25: {p25} ")

@@ -1,4 +1,4 @@
-from utils.graficar import leerColumna, leerColumnas, calcular_histograma_simple, graficar_histograma_frecuencias, graficar_curva, graficar_actividad_temporal_protocolos
+from utils.graficar import leerColumna, leerColumnas, calcular_histograma_simple, graficar_histograma_frecuencias, graficar_curva, graficar_actividad_temporal_protocolos, graficar_densidad_histograma
 from utils.estadisticas import *
 import argparse
 import numpy as np
@@ -150,6 +150,22 @@ def generarGraficoActividadTemporalAtaques(args, numFigura = 1):
     titulo = f"Temporal Attack Activity by Protocol ({ventana_segundos // 60} min window)"
     graficar_actividad_temporal_protocolos(tiempos, actividad_por_protocolo, titulo, ruta_guardado, numFigura, ZONA_HORARIA_ESPANOLA)
     print(f"Grafica de actividad temporal guardada en: {ruta_guardado}")
+
+
+def generarGraficoDensidadDuracionAtaques(args, numFigura = 1):
+    """Genera la función de densidad de probabilidad de la duración de los ataques, en segundos."""
+    ataques = _leer_ataques_temporales(args.archivo)
+
+    if not ataques:
+        print("No hay ataques TCP/UDP para generar la densidad de duración")
+        return
+
+    duraciones = [fin - inicio for inicio, fin, _ in ataques]
+    centros, densidad, anchuras = calcular_densidad_histograma(duraciones)
+
+    ruta_guardado = os.path.join(args.directorioGuardado, "densidad_duracion_ataques.png")
+    graficar_densidad_histograma(centros, densidad, anchuras, "Probability Density Function of Attack Duration", "Duration (s)", "Density", ruta_guardado, numFigura)
+    print(f"Grafica de densidad de duracion guardada en: {ruta_guardado}")
 
 
 def generarHistogramaNumeroPuertosLogaritmico(args, numFigura = 1):

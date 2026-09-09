@@ -138,6 +138,25 @@ def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecu
    
 
 
+def graficar_densidad_histograma(centros, densidad, anchuras, titulo="Densidad", xlabel="x", ylabel="Density", guardar_como=None, figura=1):
+    """
+    Dibuja una función de densidad de probabilidad como histograma normalizado
+    (barras cuya área total suma 1).
+    """
+    plt.figure(figura, figsize=(8, 5))
+    plt.bar(centros, densidad, width=anchuras, color="darkorange", alpha=0.7, edgecolor="black", linewidth=0.3)
+    plt.title(titulo)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.xlim(centros.min() - anchuras[0] / 2, centros.max() + anchuras[-1] / 2)
+    plt.ylim(bottom=0)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if guardar_como:
+        plt.savefig(guardar_como, dpi=150)
+
+
 def graficar_actividad_temporal_protocolos(tiempos, actividad_por_protocolo, titulo="Temporal Activity by Protocol", guardar_como=None, figura=1, zona_horaria=None):
     """Plots the number of active attacks over time by protocol."""
     plt.figure(figura, figsize=(12, 6))

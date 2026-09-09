@@ -6,6 +6,7 @@ TFM de Adur Albizu sobre el análisis de trazas de red para detectar escaneos de
 
 | Versión (README) | Fecha de modificación | Autor |
 |---|---|---|
+| 0.3 | 09.09.2026 | Adur Albizu |
 | 0.2 | 30.08.2026 | Adur Albizu |
 
 ## 1. Flujo de trabajo
@@ -25,8 +26,10 @@ El repositorio cubre tres etapas:
 | `Analisis/Script Neu et al/` | Implementación de Neu et al. sobre registros de flujo TCP. |
 | `Analisis/Script Sangeen/` | Implementación de Sangeen et al. mediante lectura directa de paquetes. |
 | `Analisis/Calculo Metricas/` | Scripts para generar el ground truth y calcular métricas. |
+| `Analisis/Graficado/` | Scripts para generar las gráficas de los resultados. |
 
 En los tres métodos, `main.py` utiliza la entrada propia del algoritmo y `main_desde_pcap.py` procesa un directorio de capturas independientes. 
 
 Los umbrales y ventanas temporales de cada método se encuentran en su archivo `config.py`.
+
 

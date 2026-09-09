@@ -50,7 +50,7 @@ ARCHIVO_ESTADISTICAS_POR_DIA = "estadisticas_por_dia.txt"
 ZONA_HORARIA_DIAS = "Europe/Madrid"
 
 THRESHOLD_PUERTOS_UNICOS = 10 # Limite por encima del cual considero que una conversación podría ser un escaneo
-THRESHOLD_ENTROPIA = -0.10 # Limite de h por encima del cual considero que una conversación podría ser un escaneo
+THRESHOLD_ENTROPIA = 0.98 # Limite de h por encima del cual considero que una conversación podría ser un escaneo
 THRESHOLD_PROPORCION_SONDEOS_TCP = 0.9 # La proporción de flujos TCP compatibles con un sondeo debe superar este valor
 THRESHOLD_PROPORCION_SONDEOS_UDP = 0.9 # Proporción mínima de flujos UDP sin respuesta
 
@@ -58,7 +58,7 @@ THRESHOLD_PROPORCION_SONDEOS_UDP = 0.9 # Proporción mínima de flujos UDP sin r
 INTERVALO_ESCANEOS_DIFERENTES = 30 #Intervalo a partir del cual separo dos escaneos a una misma IP
 
 # Ventana del buffer de reordenado: cuanto mayor, más desorden tolera a costa de más memoria
-VENTANA_REORDENADO = 7200
+VENTANA_REORDENADO = 43200
 
 #Rangos internos IP de la uni: 130.206.158.0 - 130.206.175.255
 RANGOS_INTERNOS =["130.206.158.0/23", #130.206.158.0 - 130.206.159.255 
