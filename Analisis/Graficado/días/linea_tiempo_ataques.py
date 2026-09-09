@@ -91,15 +91,17 @@ def generarGraficoLineaTiempoAtaques(archivo=ARCHIVO_ENTRADA, directorioGuardado
 
     # Un solo LineCollection para todos los segmentos: con miles de ataques, crear un
     # artista por segmento (p. ej. via ax.hlines en un bucle) resulta muy lento de renderizar.
-    segmentos = [
-        ((mdates.date2num(_datetime_utc_desde_unix(inicio)), carril),
-         (mdates.date2num(_datetime_utc_desde_unix(fin)), carril))
-        for (inicio, fin), carril in zip(ataques_ordenados, carriles)
-    ]
+    x_inicio = [mdates.date2num(_datetime_utc_desde_unix(inicio)) for inicio, _ in ataques_ordenados]
+    x_fin = [mdates.date2num(_datetime_utc_desde_unix(fin)) for _, fin in ataques_ordenados]
+    segmentos = [((xi, carril), (xf, carril)) for xi, xf, carril in zip(x_inicio, x_fin, carriles)]
     ejes.add_collection(LineCollection(segmentos, colors=COLOR_ATAQUE, linewidths=2))
 
-    ejes.set_xlim(mdates.date2num(_datetime_utc_desde_unix(ataques_ordenados[0][0])),
-                  mdates.date2num(_datetime_utc_desde_unix(max(fin for _, fin in ataques_ordenados))))
+    # Si la duración es muy corta respecto al rango total del eje X, la línea puede
+    # quedar por debajo de un píxel de ancho y no verse. Se marca también el inicio
+    # de cada ataque con un punto para que siga siendo visible.
+    ejes.scatter(x_inicio, carriles, color=COLOR_ATAQUE, s=8, zorder=3)
+
+    ejes.set_xlim(min(x_inicio), max(x_fin))
     ejes.set_ylim(-1, max(carriles) + 1)
     ejes.set_title(f"Attack timeline ({len(ataques_ordenados)} attacks, {max(carriles) + 1} overlapping lanes)")
     ejes.set_xlabel("Time (UTC)")
