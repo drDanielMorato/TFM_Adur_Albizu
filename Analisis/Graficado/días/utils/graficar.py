@@ -138,7 +138,7 @@ def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecu
    
 
 
-def graficar_densidad_histograma(centros, densidad, anchuras, titulo="Densidad", xlabel="x", ylabel="Density", guardar_como=None, figura=1):
+def graficar_densidad_histograma(centros, densidad, anchuras, titulo="Densidad", xlabel="x", ylabel="Density", guardar_como=None, figura=1, logaritmico=False):
     """
     Dibuja una función de densidad de probabilidad como histograma normalizado
     (barras cuya área total suma 1).
@@ -148,6 +148,8 @@ def graficar_densidad_histograma(centros, densidad, anchuras, titulo="Densidad",
     plt.title(titulo)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
+    plt.xscale("log" if logaritmico else "linear")
+    plt.yscale("linear")
     plt.xlim(centros.min() - anchuras[0] / 2, centros.max() + anchuras[-1] / 2)
     plt.ylim(bottom=0)
     plt.grid(True, alpha=0.3)

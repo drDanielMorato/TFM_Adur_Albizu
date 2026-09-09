@@ -76,7 +76,7 @@ def generarHistogramaNumeroPuertosPorProtocolo(args, protocolo, titulo = "", num
     graficar_histograma_frecuencias(x, f, titulo, "Unique ports", "Frecuency", None, ruta_guardado, 10001, False, numFigura)
 
 
-def _leer_ataques_temporales(ruta_txt):
+def _leer_ataques_temporales(ruta_txt, conservar_ceros=False):
     ataques = []
     with open(ruta_txt, "r", encoding="utf-8") as archivo:
         for numero_linea, linea in enumerate(archivo, start=1):
@@ -97,7 +97,7 @@ def _leer_ataques_temporales(ruta_txt):
             if fin < inicio:
                 inicio, fin = fin, inicio
 
-            if fin == inicio:
+            if fin == inicio and not conservar_ceros:
                 fin = inicio + 1
 
             ataques.append((inicio, fin, protocolo))
@@ -154,17 +154,28 @@ def generarGraficoActividadTemporalAtaques(args, numFigura = 1):
 
 def generarGraficoDensidadDuracionAtaques(args, numFigura = 1):
     """Genera la función de densidad de probabilidad de la duración de los ataques, en segundos."""
-    ataques = _leer_ataques_temporales(args.archivo)
+    ataques = _leer_ataques_temporales(args.archivo, conservar_ceros=True)
 
     if not ataques:
         print("No hay ataques TCP/UDP para generar la densidad de duración")
         return
 
-    duraciones = [fin - inicio for inicio, fin, _ in ataques]
-    centros, densidad, anchuras = calcular_densidad_histograma(duraciones)
+    duraciones = np.asarray([fin - inicio for inicio, fin, _ in ataques])
+    ceros = np.count_nonzero(duraciones == 0)
+    invalidas = np.count_nonzero(~np.isfinite(duraciones))
+    if ceros or invalidas:
+        print(f"Fuera del eje logarítmico: {ceros} ataques de duración cero y {invalidas} no finitos")
+    duraciones = duraciones[np.isfinite(duraciones) & (duraciones > 0)]
+    if duraciones.size == 0:
+        print("No hay duraciones positivas para generar el histograma logarítmico")
+        return
+    centros, densidad, anchuras = calcular_densidad_histograma(duraciones, bins=50, logaritmico=True)
 
     ruta_guardado = os.path.join(args.directorioGuardado, "densidad_duracion_ataques.png")
-    graficar_densidad_histograma(centros, densidad, anchuras, "Probability Density Function of Attack Duration", "Duration (s)", "Density", ruta_guardado, numFigura)
+    titulo = "Attack Duration Density (positive durations)"
+    if ceros or invalidas:
+        titulo += f"\nExcluded: {ceros} zero-duration, {invalidas} non-finite"
+    graficar_densidad_histograma(centros, densidad, anchuras, titulo, "Duration (s, log scale)", "Density (1/s)", ruta_guardado, numFigura, logaritmico=True)
     print(f"Grafica de densidad de duracion guardada en: {ruta_guardado}")
 
 

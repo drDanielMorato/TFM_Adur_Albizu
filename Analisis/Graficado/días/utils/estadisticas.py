@@ -52,11 +52,18 @@ def filtrarPorIpSrc(x,z,quedarmeConInterna):
     """
     return [xi for xi, zi in zip(x, z) if esIpInterna(zi) == quedarmeConInterna]
 
-def calcular_densidad_histograma(datos, bins=50):
+def calcular_densidad_histograma(datos, bins=50, logaritmico=False):
     """Calcula una función de densidad de probabilidad a partir de un histograma normalizado.
     Devuelve (centros_bin, densidad, anchura_bin).
     """
     datos = np.asarray(datos, dtype=float)
+    if logaritmico:
+        if datos.size == 0 or not np.all(np.isfinite(datos) & (datos > 0)):
+            raise ValueError("Los intervalos logarítmicos requieren duraciones positivas y finitas")
+        minimo, maximo = datos.min(), datos.max()
+        if minimo == maximo:
+            minimo, maximo = minimo / 2, maximo * 2
+        bins = np.geomspace(minimo, maximo, bins + 1)
     densidad, bordes = np.histogram(datos, bins=bins, density=True)
     centros = (bordes[:-1] + bordes[1:]) / 2
     anchuras = bordes[1:] - bordes[:-1]
