@@ -52,7 +52,7 @@ def filtrarPorIpSrc(x,z,quedarmeConInterna):
     """
     return [xi for xi, zi in zip(x, z) if esIpInterna(zi) == quedarmeConInterna]
 
-def calcular_densidad_histograma(datos, bins="auto"):
+def calcular_densidad_histograma(datos, bins=50):
     """Calcula una función de densidad de probabilidad a partir de un histograma normalizado.
     Devuelve (centros_bin, densidad, anchura_bin).
     """
