@@ -19,6 +19,12 @@ from implementaciones import (  # noqa: E402
     generarGraficoDensidadDuracionAtaques,
     generarHistogramaNumeroPuertos,
 )
+from ranking import (  # noqa: E402
+    dia_excluido,
+    escribir_ranking_dia,
+    escribir_ranking_global,
+    fusionar_contactos,
+)
 from utils.lectura import leer_registros  # noqa: E402
 
 ENTRADA_POR_DEFECTO = "/VD0_4SAS8TB_R5/TfmTrazas/adur.albizu/exploracion2"
@@ -57,7 +63,7 @@ def _buscar_txt(ruta_dia):
     return os.path.join(ruta_dia, ficheros[0])
 
 
-def procesar_dia(ruta_txt, directorio_salida, prefijo):
+def procesar_dia(ruta_txt, directorio_salida, prefijo, nombre_dia, contactos_globales):
     os.makedirs(directorio_salida, exist_ok=True)
 
     registros = leer_registros(ruta_txt)
@@ -66,6 +72,14 @@ def procesar_dia(ruta_txt, directorio_salida, prefijo):
     generarGraficoCDFPuertosUnicos(registros, directorio_salida, prefijo)
     generarGraficoActividadTemporalAtaques(registros, directorio_salida, prefijo)
     generarGraficoDensidadDuracionAtaques(registros, directorio_salida, prefijo)
+
+    if dia_excluido(nombre_dia):
+        print("  Dia excluido del ranking")
+        return False
+
+    escribir_ranking_dia(registros.contactos, directorio_salida, prefijo)
+    fusionar_contactos(contactos_globales, registros.contactos)
+    return True
 
 
 def main():
@@ -92,6 +106,10 @@ def main():
 
     print(f"Carpetas de dia encontradas: {len(carpetas)}")
 
+    contactos_globales = {}
+    dias_incluidos = []
+    dias_descartados = 0
+
     for indice, (disco, dia, ruta_dia) in enumerate(carpetas, start=1):
         ruta_txt = _buscar_txt(ruta_dia)
         print(f"[{indice}/{len(carpetas)}] {disco}/{dia}")
@@ -104,13 +122,22 @@ def main():
         directorio_salida = os.path.join(args.directorioGuardado, dia)
 
         try:
-            procesar_dia(ruta_txt, directorio_salida, prefijo)
+            incluido = procesar_dia(ruta_txt, directorio_salida, prefijo, dia, contactos_globales)
         except Exception as error:  # una carpeta corrupta no debe parar el lote entero
             print(f"  Error procesando {ruta_txt}: {error}")
             continue
 
+        if incluido:
+            dias_incluidos.append(dia)
+        else:
+            dias_descartados += 1
+
         print(f"  Guardado en {directorio_salida}")
 
+    ruta_global = escribir_ranking_global(
+        contactos_globales, args.directorioGuardado, dias_incluidos, dias_descartados
+    )
+    print(f"Ranking global guardado en {ruta_global}")
     print("Procesado terminado")
 
 

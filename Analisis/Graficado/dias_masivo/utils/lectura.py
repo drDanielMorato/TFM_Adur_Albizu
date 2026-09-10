@@ -22,7 +22,10 @@ ZONA_HORARIA_ESPANOLA = ZoneInfo("Europe/Madrid") if ZoneInfo else None
 COL_INICIO = 0
 COL_FIN = 1
 COL_PROTOCOLO = 6
+COL_IP_SRC = 7
+COL_IP_DST = 8
 COL_PUERTOS_UNICOS = 11
+COL_PUERTOS = 12
 NUM_COLUMNAS_MINIMAS = 12
 
 LINEAS_CABECERA = 2
@@ -31,11 +34,13 @@ LINEAS_CABECERA = 2
 class RegistrosDia:
     """Datos ya agregados de un fichero resultado.txt."""
 
-    def __init__(self, conteo_puertos, inicios, fines, protocolos):
+    def __init__(self, conteo_puertos, inicios, fines, protocolos, contactos=None):
         self.conteo_puertos = conteo_puertos
         self.inicios = np.asarray(inicios, dtype=float)
         self.fines = np.asarray(fines, dtype=float)
         self.protocolos = np.asarray(protocolos, dtype="U3")
+        # {protocolo: {ip_origen: {ip_destino: set(puertos)}}}
+        self.contactos = contactos if contactos is not None else {}
 
     @property
     def hay_puertos(self):
@@ -71,6 +76,7 @@ def leer_registros(ruta_txt):
     inicios = []
     fines = []
     protocolos = []
+    contactos = {}
     lineas_utiles = 0
 
     with open(ruta_txt, "r", encoding="utf-8", errors="replace") as archivo:
@@ -106,7 +112,12 @@ def leer_registros(ruta_txt):
             fines.append(fin)
             protocolos.append(protocolo)
 
-    return RegistrosDia(conteo_puertos, inicios, fines, protocolos)
+            if len(partes) > COL_PUERTOS:
+                puertos = {int(p) for p in partes[COL_PUERTOS].split(",") if p.strip().isdigit()}
+                victimas = contactos.setdefault(protocolo, {}).setdefault(partes[COL_IP_SRC], {})
+                victimas.setdefault(partes[COL_IP_DST], set()).update(puertos)
+
+    return RegistrosDia(conteo_puertos, inicios, fines, protocolos, contactos)
 
 
 def _ultimo_domingo(year, month):
