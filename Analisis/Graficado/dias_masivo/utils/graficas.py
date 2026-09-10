@@ -18,30 +18,26 @@ COLORES_PROTOCOLO = {
 }
 
 
-def _anchuras_logaritmicas(x, fraccion=0.004):
-    """Anchura de barra que se ve constante sobre un eje X logaritmico."""
-    factor = 10.0 ** fraccion
-    return x * (factor - 1.0 / factor)
-
-
 def _etiqueta_log(etiqueta):
     """Marca la etiqueta de un eje logaritmico."""
     return f"{etiqueta} (log scale)"
 
 
-def graficar_histograma_loglog(x, frecuencias, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=65500):
-    """Histograma de frecuencias con ambos ejes logaritmicos."""
-    x = np.asarray(x, dtype=float)
-    frecuencias = np.asarray(frecuencias, dtype=float)
+def graficar_histograma_loglog(bordes, conteos, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=65500):
+    """Histograma de bins logaritmicos con ambos ejes logaritmicos."""
+    bordes = np.asarray(bordes, dtype=float)
+    conteos = np.asarray(conteos, dtype=float)
+    anchuras = np.diff(bordes)
 
-    # El eje logaritmico no admite ceros ni valores fuera del rango pedido.
-    mascara = (x > 0) & (frecuencias > 0)
-    x, frecuencias = x[mascara], frecuencias[mascara]
-    if x.size == 0:
+    # El eje logaritmico no admite ceros.
+    visibles = conteos > 0
+    if not visibles.any():
         return False
 
     figura, ejes = plt.subplots(figsize=(8, 5))
-    ejes.bar(x, frecuencias, width=_anchuras_logaritmicas(x), color="steelblue", edgecolor="black", linewidth=0.3)
+    # align="edge" hace que cada barra ocupe exactamente su bin, sin solapes.
+    ejes.bar(bordes[:-1][visibles], conteos[visibles], width=anchuras[visibles],
+             align="edge", color="steelblue", edgecolor="black", linewidth=0.3)
     ejes.set_xscale("log")
     ejes.set_yscale("log")
     ejes.set_xlim(x_min, x_max)
