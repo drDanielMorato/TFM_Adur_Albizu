@@ -1,4 +1,4 @@
-"""Punto de entrada para generar la línea de tiempo de ataques (ver linea_tiempo_ataques.py)."""
+"""Generamos una línea temporal para mostrar todos los ataques y duración (de una ip a otra en concreto="""
 
 import argparse
 
