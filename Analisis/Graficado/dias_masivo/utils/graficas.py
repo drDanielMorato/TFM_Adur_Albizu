@@ -24,6 +24,11 @@ def _anchuras_logaritmicas(x, fraccion=0.004):
     return x * (factor - 1.0 / factor)
 
 
+def _etiqueta_log(etiqueta):
+    """Marca la etiqueta de un eje logaritmico."""
+    return f"{etiqueta} (log scale)"
+
+
 def graficar_histograma_loglog(x, frecuencias, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=65500):
     """Histograma de frecuencias con ambos ejes logaritmicos."""
     x = np.asarray(x, dtype=float)
@@ -42,8 +47,8 @@ def graficar_histograma_loglog(x, frecuencias, titulo, xlabel, ylabel, ruta_guar
     ejes.set_xlim(x_min, x_max)
     ejes.set_ylim(bottom=0.8)  # las frecuencias son enteras, no bajan de 1
     ejes.set_title(titulo)
-    ejes.set_xlabel(xlabel)
-    ejes.set_ylabel(ylabel)
+    ejes.set_xlabel(_etiqueta_log(xlabel))
+    ejes.set_ylabel(_etiqueta_log(ylabel))
     ejes.grid(True, which="both", alpha=0.3)
     figura.tight_layout()
     figura.savefig(ruta_guardado, dpi=150)
@@ -52,9 +57,9 @@ def graficar_histograma_loglog(x, frecuencias, titulo, xlabel, ylabel, ruta_guar
 
 
 def graficar_cdf(x, y, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=None):
-    """CDF acotada a la zona donde realmente cambia."""
+    """CDF empirica como funcion escalonada, sin interpolar entre valores."""
     figura, ejes = plt.subplots(figsize=(8, 5))
-    ejes.plot(x, y, color="green", linewidth=1.4)
+    ejes.plot(x, y, color="green", linewidth=1.4, drawstyle="steps-post")
     ejes.set_xlim(x_min, x_max)
     ejes.set_ylim(0, 1.05)
     ejes.set_title(titulo)
@@ -76,9 +81,11 @@ def graficar_actividad_temporal(tiempos, actividad_por_protocolo, titulo, ruta_g
 
     ejes.set_yscale("log", nonpositive="clip")
     ejes.set_ylim(bottom=0.8)  # el numero de ataques activos es entero
+    if len(tiempos) > 1:
+        ejes.set_xlim(tiempos[0], tiempos[-1])
     ejes.set_title(titulo)
     ejes.set_xlabel("Time (UTC+1)")
-    ejes.set_ylabel("Active attacks")
+    ejes.set_ylabel(_etiqueta_log("Active attacks"))
     ejes.legend()
     ejes.grid(True, which="both", alpha=0.3)
     ejes.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -106,8 +113,8 @@ def graficar_densidad_loglog(centros, densidad, anchuras, titulo, xlabel, ylabel
     ejes.set_yscale("log")
     ejes.set_xlim(centros.min() - anchuras[0] / 2, centros.max() + anchuras[-1] / 2)
     ejes.set_title(titulo)
-    ejes.set_xlabel(xlabel)
-    ejes.set_ylabel(ylabel)
+    ejes.set_xlabel(_etiqueta_log(xlabel))
+    ejes.set_ylabel(_etiqueta_log(ylabel))
     ejes.grid(True, which="both", alpha=0.3)
     figura.tight_layout()
     figura.savefig(ruta_guardado, dpi=150)

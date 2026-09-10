@@ -19,7 +19,8 @@ from utils.lectura import ZONA_HORARIA_ESPANOLA, datetime_espanol_desde_unix
 
 X_MIN_PUERTOS = 10
 X_MAX_PUERTOS = 65500
-CUANTIL_CORTE_CDF = 0.999
+X_MIN_CDF = 11
+CUANTIL_CORTE_CDF = 0.95
 BINS_DENSIDAD = 50
 
 
@@ -43,7 +44,7 @@ def generarHistogramaNumeroPuertos(registros, directorio_salida, prefijo):
 
 
 def generarGraficoCDFPuertosUnicos(registros, directorio_salida, prefijo):
-    """CDF de puertos unicos, acotada a la zona donde la curva cambia."""
+    """CDF empirica de puertos unicos, dibujada como escalera."""
     if not registros.hay_puertos:
         print("  Sin conversaciones para la CDF de puertos unicos")
         return
@@ -52,15 +53,15 @@ def generarGraficoCDFPuertosUnicos(registros, directorio_salida, prefijo):
     acumulado = np.cumsum(frecuencias)
     y = acumulado / acumulado[-1]
 
-    # Cortamos donde la CDF practicamente ya vale 1 para no arrastrar la cola plana.
+    # Cortamos donde la CDF ya es practicamente 1, para no aplastar la zona de cambio.
     indice_corte = int(np.searchsorted(y, CUANTIL_CORTE_CDF))
     indice_corte = min(indice_corte, valores.size - 1)
-    x_max = float(valores[indice_corte]) * 1.05
-    x_max = max(x_max, X_MIN_PUERTOS + 1)
+    x_max = max(float(valores[indice_corte]) * 1.05, X_MIN_CDF + 1)
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_cdf_puertos_unicos.png")
-    graficar_cdf(valores, y, "CDF of Unique Ports", "Unique ports", "CDF", ruta,
-                 x_min=X_MIN_PUERTOS, x_max=x_max)
+    titulo = f"CDF of Unique Ports (X axis cut at P{CUANTIL_CORTE_CDF * 100:g})"
+    graficar_cdf(valores, y, titulo, "Unique ports", "CDF", ruta,
+                 x_min=X_MIN_CDF, x_max=x_max)
 
 
 def _calcular_ventana_segundos(inicio, fin):
