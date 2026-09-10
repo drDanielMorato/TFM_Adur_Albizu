@@ -23,25 +23,24 @@ def _etiqueta_log(etiqueta):
     return f"{etiqueta} (log scale)"
 
 
-def graficar_histograma_loglog(bordes, conteos, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=65500):
-    """Histograma de bins logaritmicos con ambos ejes logaritmicos."""
-    bordes = np.asarray(bordes, dtype=float)
-    conteos = np.asarray(conteos, dtype=float)
-    anchuras = np.diff(bordes)
+def graficar_histograma_loglog(x, frecuencias, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=65500):
+    """Histograma con una linea por valor exacto y ambos ejes logaritmicos."""
+    x = np.asarray(x, dtype=float)
+    frecuencias = np.asarray(frecuencias, dtype=float)
 
     # El eje logaritmico no admite ceros.
-    visibles = conteos > 0
+    visibles = (x > 0) & (frecuencias > 0)
     if not visibles.any():
         return False
 
+    base = 0.8
     figura, ejes = plt.subplots(figsize=(8, 5))
-    # align="edge" hace que cada barra ocupe exactamente su bin, sin solapes.
-    ejes.bar(bordes[:-1][visibles], conteos[visibles], width=anchuras[visibles],
-             align="edge", color="steelblue", edgecolor="black", linewidth=0.3)
+    # Lineas de grosor fijo en pantalla: un ancho en unidades de dato se deformaria con la escala log.
+    ejes.vlines(x[visibles], base, frecuencias[visibles], color="steelblue", linewidth=0.7)
     ejes.set_xscale("log")
     ejes.set_yscale("log")
     ejes.set_xlim(x_min, x_max)
-    ejes.set_ylim(bottom=0.8)  # las frecuencias son enteras, no bajan de 1
+    ejes.set_ylim(bottom=base)  # las frecuencias son enteras, no bajan de 1
     ejes.set_title(titulo)
     ejes.set_xlabel(_etiqueta_log(xlabel))
     ejes.set_ylabel(_etiqueta_log(ylabel))

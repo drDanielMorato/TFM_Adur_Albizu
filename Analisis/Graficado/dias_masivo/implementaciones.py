@@ -19,7 +19,6 @@ from utils.lectura import ZONA_HORARIA_ESPANOLA, datetime_espanol_desde_unix
 
 X_MIN_PUERTOS = 10
 X_MAX_PUERTOS = 65500
-BINS_HISTOGRAMA = 60
 X_MIN_CDF = 11
 CUANTIL_CORTE_CDF = 0.95
 BINS_DENSIDAD = 50
@@ -33,19 +32,14 @@ def generarHistogramaNumeroPuertos(registros, directorio_salida, prefijo):
 
     valores, frecuencias = registros.puertos_ordenados()
 
-    # Bins de ancho constante en escala log: si no, los valores altos se solapan entre si.
-    bordes = np.geomspace(X_MIN_PUERTOS, X_MAX_PUERTOS, BINS_HISTOGRAMA + 1)
     dentro = (valores >= X_MIN_PUERTOS) & (valores <= X_MAX_PUERTOS)
-    indices = np.clip(np.searchsorted(bordes, valores[dentro], side="right") - 1, 0, BINS_HISTOGRAMA - 1)
-    conteos = np.bincount(indices, weights=frecuencias[dentro], minlength=BINS_HISTOGRAMA)
-
     fuera = int(frecuencias.sum() - frecuencias[dentro].sum())
     if fuera:
         print(f"  {fuera} conversaciones fuera del rango [{X_MIN_PUERTOS}, {X_MAX_PUERTOS}] puertos unicos")
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_histograma_puertos_unicos.png")
     dibujada = graficar_histograma_loglog(
-        bordes, conteos,
+        valores, frecuencias,
         "Distribution of Conversations by Number of Unique Ports",
         "Unique ports", "Frequency", ruta,
         x_min=X_MIN_PUERTOS, x_max=X_MAX_PUERTOS,
