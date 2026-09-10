@@ -62,7 +62,7 @@ def generarGraficoCDFPuertosUnicos(registros, directorio_salida, prefijo):
     # Cortamos donde la CDF ya es practicamente 1, para no aplastar la zona de cambio.
     indice_corte = int(np.searchsorted(y, CUANTIL_CORTE_CDF))
     indice_corte = min(indice_corte, valores.size - 1)
-    x_max = max(float(valores[indice_corte]) * 1.05, X_MIN_CDF + 1)
+    x_max = max(float(valores[indice_corte]), X_MIN_CDF + 1)
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_cdf_puertos_unicos.png")
     graficar_cdf(valores, y, "CDF of Unique Ports", "Unique ports", "CDF", ruta,
