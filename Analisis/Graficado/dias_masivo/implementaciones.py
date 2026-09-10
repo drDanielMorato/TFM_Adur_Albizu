@@ -20,7 +20,7 @@ from utils.lectura import ZONA_HORARIA_ESPANOLA, datetime_espanol_desde_unix
 X_MIN_PUERTOS = 10
 X_MAX_PUERTOS = 65500
 X_MIN_CDF = 11
-CUANTIL_CORTE_CDF = 0.95
+CUANTIL_CORTE_CDF = 0.98
 BINS_DENSIDAD = 50
 
 
@@ -65,8 +65,7 @@ def generarGraficoCDFPuertosUnicos(registros, directorio_salida, prefijo):
     x_max = max(float(valores[indice_corte]) * 1.05, X_MIN_CDF + 1)
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_cdf_puertos_unicos.png")
-    titulo = f"CDF of Unique Ports (X axis cut at P{CUANTIL_CORTE_CDF * 100:g})"
-    graficar_cdf(valores, y, titulo, "Unique ports", "CDF", ruta,
+    graficar_cdf(valores, y, "CDF of Unique Ports", "Unique ports", "CDF", ruta,
                  x_min=X_MIN_CDF, x_max=x_max)
 
 
@@ -129,7 +128,7 @@ def generarGraficoActividadTemporalAtaques(registros, directorio_salida, prefijo
         actividad_por_protocolo[protocolo] = _actividad_por_ventana(inicios[mascara], fines[mascara], bordes)
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_actividad_temporal_ataques.png")
-    titulo = f"Temporal Attack Activity by Protocol ({ventana_segundos // 60} min window)"
+    titulo = "Temporal Attack Activity by Protocol"
     graficar_actividad_temporal(tiempos, actividad_por_protocolo, titulo, ruta, ZONA_HORARIA_ESPANOLA)
 
     _escribir_ataques_por_segundo(registros, directorio_salida, prefijo,
@@ -191,9 +190,9 @@ def generarGraficoDensidadDuracionAtaques(registros, directorio_salida, prefijo)
     centros = (bordes[:-1] + bordes[1:]) / 2
     anchuras = bordes[1:] - bordes[:-1]
 
-    titulo = "Attack Duration Density (positive durations)"
+    titulo = "Attack Duration Density"
     if ceros:
-        titulo += f"\nExcluded: {ceros} zero-duration"
+        print(f"  {ceros} ataques de duracion cero excluidos del eje logaritmico")
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_densidad_duracion_ataques.png")
     dibujada = graficar_densidad_loglog(centros, densidad, anchuras, titulo,

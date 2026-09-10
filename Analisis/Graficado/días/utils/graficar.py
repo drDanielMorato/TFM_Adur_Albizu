@@ -98,19 +98,21 @@ def graficar_histograma_frecuencias(x, frecuencia, titulo="Histograma",
             ancho_barra = 0.01
  
     plt.figure(figura,figsize=(8, 5))
-    plt.bar(x, frecuencia, width=ancho_barra, color="steelblue", edgecolor="black")
+    plt.bar(x, frecuencia, width=ancho_barra, color="steelblue", edgecolor="black", linewidth=0.3)
     # plt.plot(x,frecuencia)
     plt.title(titulo)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.tight_layout()
-    # plt.grid(True)
     plt.xlim(min(x),maxEjeX)
 
     if logaritmico:
         plt.yscale('log', base = 10)
+        plt.grid(True, which="both", alpha=0.3)
     else:
         plt.yscale('linear')
+        plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
  
     if guardar_como:
         plt.savefig(guardar_como, dpi=150)
@@ -127,10 +129,10 @@ def graficar_curva(x, frecuencia, titulo="Histograma", xlabel="x", ylabel="Frecu
     plt.title(titulo)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.tight_layout()
     plt.grid(True, alpha=0.3)
     plt.xlim(min(x),maxEjeX)
-    plt.plot(x,frecuencia,'green')
+    plt.plot(x, frecuencia, color="green", linewidth=1.4)
+    plt.tight_layout()
  
     if guardar_como:
         plt.savefig(guardar_como, dpi=150)
@@ -152,7 +154,7 @@ def graficar_densidad_histograma(centros, densidad, anchuras, titulo="Densidad",
     plt.yscale("linear")
     plt.xlim(centros.min() - anchuras[0] / 2, centros.max() + anchuras[-1] / 2)
     plt.ylim(bottom=0)
-    plt.grid(True, alpha=0.3)
+    plt.grid(True, which="both" if logaritmico else "major", alpha=0.3)
     plt.tight_layout()
 
     if guardar_como:
