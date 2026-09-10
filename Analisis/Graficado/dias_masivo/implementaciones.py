@@ -63,6 +63,8 @@ def generarGraficoCDFPuertosUnicos(registros, directorio_salida, prefijo):
     indice_corte = int(np.searchsorted(y, CUANTIL_CORTE_CDF))
     indice_corte = min(indice_corte, valores.size - 1)
     x_max = max(float(valores[indice_corte]), X_MIN_CDF + 1)
+    # El salto del percentil debe quedar dentro del eje, no debajo del marco.
+    x_max += 0.01 * (x_max - X_MIN_CDF)
 
     ruta = os.path.join(directorio_salida, f"{prefijo}_cdf_puertos_unicos.png")
     graficar_cdf(valores, y, "CDF of Unique Ports", "Unique ports", "CDF", ruta,

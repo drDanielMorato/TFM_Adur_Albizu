@@ -53,6 +53,19 @@ def graficar_histograma_loglog(x, frecuencias, titulo, xlabel, ylabel, ruta_guar
 
 def graficar_cdf(x, y, titulo, xlabel, ylabel, ruta_guardado, x_min=10, x_max=None):
     """CDF empirica como funcion escalonada, sin interpolar entre valores."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    if x_max is None:
+        x_max = float(x[-1])
+
+    limites = np.array([x_min, x_max], dtype=float)
+    indices = np.searchsorted(x, limites, side="right") - 1
+    y_limites = np.where(indices >= 0, y[np.maximum(indices, 0)], 0.0)
+    dentro = (x > x_min) & (x < x_max)
+    # La CDF permanece constante fuera de su soporte, tambien despues del maximo.
+    x = np.concatenate(([x_min], x[dentro], [x_max]))
+    y = np.concatenate(([y_limites[0]], y[dentro], [y_limites[1]]))
+
     figura, ejes = plt.subplots(figsize=(8, 5))
     ejes.plot(x, y, color="green", linewidth=1.4, drawstyle="steps-post")
     ejes.set_xlim(x_min, x_max)
