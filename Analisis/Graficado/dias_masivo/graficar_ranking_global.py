@@ -58,13 +58,12 @@ def read_ranking(path):
 
 
 def plot_ranking(rankings, output_path, logarithmic_y=False):
-    """Plot columns 4 and 5 against the rank on separate vertical axes."""
-    figure, victims_axes = plt.subplots(figsize=(12, 6.5))
-    ports_axes = victims_axes.twinx()
+    """Plot columns 4 and 5 against rank in aligned charts."""
+    figure, (victims_axes, ports_axes) = plt.subplots(
+        2, 1, figsize=(12, 8), sharex=True, layout="constrained"
+    )
     victims_color = "#365C6D"
     ports_color = "#9B5C5C"
-    victims_lines = []
-    ports_lines = []
     all_ranks = []
     all_victims = []
     all_mean_unique_ports = []
@@ -76,28 +75,22 @@ def plot_ranking(rankings, output_path, logarithmic_y=False):
         all_ranks.extend(ranks)
         all_victims.extend(victims)
         all_mean_unique_ports.extend(mean_unique_ports)
-        victims_lines.extend(
-            victims_axes.plot(
-                ranks,
-                victims,
-                color=victims_color,
-                linewidth=1.5,
-                label=f"{protocol} - Number of victims",
-            )
+        victims_axes.plot(
+            ranks,
+            victims,
+            color=victims_color,
+            linewidth=1.5,
+            label=protocol,
         )
-        ports_lines.extend(
-            ports_axes.plot(
-                ranks,
-                mean_unique_ports,
-                color=ports_color,
-                linewidth=1.1,
-                alpha=0.85,
-                label=f"{protocol} - Mean unique ports per victim",
-            )
+        ports_axes.plot(
+            ranks,
+            mean_unique_ports,
+            color=ports_color,
+            linewidth=1.1,
+            label=protocol,
         )
 
-    victims_axes.set_title("Global Attacker Ranking")
-    victims_axes.set_xlabel("Rank")
+    figure.suptitle("Global Attacker Ranking")
     victims_ylabel = "Number of victims"
     ports_ylabel = "Mean unique ports per victim"
     if logarithmic_y:
@@ -108,6 +101,7 @@ def plot_ranking(rankings, output_path, logarithmic_y=False):
 
     victims_axes.set_ylabel(victims_ylabel, color=victims_color)
     ports_axes.set_ylabel(ports_ylabel, color=ports_color)
+    ports_axes.set_xlabel("Rank")
     victims_axes.set_xlim(left=1, right=max(all_ranks))
     if logarithmic_y:
         victims_axes.set_ylim(min(all_victims), max(all_victims) * 1.15)
@@ -118,9 +112,10 @@ def plot_ranking(rankings, output_path, logarithmic_y=False):
     victims_axes.tick_params(axis="y", colors=victims_color)
     ports_axes.tick_params(axis="y", colors=ports_color)
     victims_axes.grid(True, alpha=0.3)
-    lines = victims_lines + ports_lines
-    victims_axes.legend(lines, [line.get_label() for line in lines], loc="upper right")
-    figure.tight_layout()
+    ports_axes.grid(True, alpha=0.3)
+    if len(rankings) > 1:
+        victims_axes.legend(title="Protocol")
+        ports_axes.legend(title="Protocol")
     figure.savefig(output_path, dpi=150)
     plt.close(figure)
 
