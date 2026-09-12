@@ -18,6 +18,15 @@ ROW_PATTERN = re.compile(
 )
 
 
+def _bounds(values, logarithmic=False):
+    """Return readable axis bounds with a small margin around the data."""
+    minimum = min(values)
+    maximum = max(values)
+    if logarithmic:
+        return minimum / 1.15, maximum * 1.15
+    return max(0, minimum - (maximum - minimum) * 0.05), maximum * 1.05
+
+
 def read_ranking(path):
     """Return ranking rows grouped by protocol."""
     rankings = {}
@@ -48,7 +57,7 @@ def read_ranking(path):
     return {protocol: rows for protocol, rows in rankings.items() if rows}
 
 
-def plot_ranking(rankings, output_path):
+def plot_ranking(rankings, output_path, logarithmic_y=False):
     """Plot columns 4 and 5 against the rank on separate vertical axes."""
     figure, victims_axes = plt.subplots(figsize=(12, 6.5))
     ports_axes = victims_axes.twinx()
@@ -56,11 +65,17 @@ def plot_ranking(rankings, output_path):
     ports_color = "#9B5C5C"
     victims_lines = []
     ports_lines = []
+    all_ranks = []
+    all_victims = []
+    all_mean_unique_ports = []
 
     for protocol, rows in rankings.items():
         ranks = [row["rank"] for row in rows]
         victims = [row["victims"] for row in rows]
         mean_unique_ports = [row["mean_unique_ports"] for row in rows]
+        all_ranks.extend(ranks)
+        all_victims.extend(victims)
+        all_mean_unique_ports.extend(mean_unique_ports)
         victims_lines.extend(
             victims_axes.plot(
                 ranks,
@@ -83,11 +98,23 @@ def plot_ranking(rankings, output_path):
 
     victims_axes.set_title("Global Attacker Ranking")
     victims_axes.set_xlabel("Rank")
-    victims_axes.set_ylabel("Number of victims", color=victims_color)
-    ports_axes.set_ylabel("Mean unique ports per victim", color=ports_color)
-    victims_axes.set_xlim(left=1, right=max(ranks))
-    victims_axes.set_ylim(bottom=0)
-    ports_axes.set_ylim(bottom=0)
+    victims_ylabel = "Number of victims"
+    ports_ylabel = "Mean unique ports per victim"
+    if logarithmic_y:
+        victims_axes.set_yscale("log")
+        ports_axes.set_yscale("log")
+        victims_ylabel += " (log scale)"
+        ports_ylabel += " (log scale)"
+
+    victims_axes.set_ylabel(victims_ylabel, color=victims_color)
+    ports_axes.set_ylabel(ports_ylabel, color=ports_color)
+    victims_axes.set_xlim(left=1, right=max(all_ranks))
+    if logarithmic_y:
+        victims_axes.set_ylim(min(all_victims), max(all_victims) * 1.15)
+        ports_axes.set_ylim(min(all_mean_unique_ports), max(all_mean_unique_ports) * 1.15)
+    else:
+        victims_axes.set_ylim(*_bounds(all_victims))
+        ports_axes.set_ylim(*_bounds(all_mean_unique_ports))
     victims_axes.tick_params(axis="y", colors=victims_color)
     ports_axes.tick_params(axis="y", colors=ports_color)
     victims_axes.grid(True, alpha=0.3)
@@ -104,17 +131,23 @@ def main():
     )
     parser.add_argument("input", nargs="?", default=DEFAULT_INPUT, help="Global ranking text file")
     parser.add_argument("--output", help="Output PNG path")
+    parser.add_argument(
+        "--log-y",
+        action="store_true",
+        help="Use logarithmic scales for both vertical axes",
+    )
     args = parser.parse_args()
 
     if not os.path.isfile(args.input):
         parser.error(f"Input file does not exist: {args.input}")
 
-    output_path = args.output or os.path.splitext(args.input)[0] + ".png"
+    default_suffix = "_log" if args.log_y else ""
+    output_path = args.output or os.path.splitext(args.input)[0] + default_suffix + ".png"
     rankings = read_ranking(args.input)
     if not rankings:
         parser.error("No ranking rows were found in the input file")
 
-    plot_ranking(rankings, output_path)
+    plot_ranking(rankings, output_path, logarithmic_y=args.log_y)
     row_count = sum(len(rows) for rows in rankings.values())
     print(f"Chart saved to {output_path} ({row_count} rows)")
 
